@@ -32,14 +32,35 @@ STRUCTURE_FOR_DATASET = {
 IPTM_SCORES = {"iptm", "ptm"}
 
 
+def completeness_error_from_sum(
+    ig_sum: float, f_x: float, f_baseline: float,
+) -> float:
+    """Relative error of the completeness identity: sum(IG) vs f(x) - f(baseline).
+
+    Mirrors :func:`igv.attrib.completeness_error`, which cannot be reused here
+    because it takes an ``AttribResult`` and the Protenix path carries numpy
+    arrays. Returns 0.0 when the denominator and numerator are both zero, and
+    inf when only the denominator is.
+    """
+    diff = f_x - f_baseline
+    if abs(diff) == 0.0:
+        return 0.0 if abs(ig_sum) == 0.0 else float("inf")
+    return abs(ig_sum - diff) / abs(diff)
+
+
 def _ig_res_type(
     model, input_feature_dict, score_name, x_pred,
     baseline_name: str,
     m_steps: int,
     n_cycle: int,
     quadrature: str = "gausslegendre",
-) -> np.ndarray:
-    """Integrated gradient of the score w.r.t. restype."""
+) -> tuple[np.ndarray, "torch.Tensor"]:
+    """Integrated gradient of the score w.r.t. restype.
+
+    Returns (accumulated, rt_baseline) where accumulated is a 2-D numpy array
+    of shape (L_full, num_tokens) and rt_baseline is the baseline tensor used
+    for the path integral.
+    """
     import torch
     from igv.protenix_score import (
         build_mean_aa_res_type_baseline,
@@ -98,7 +119,7 @@ def _ig_res_type(
         accumulated += weight * g.astype(np.float64)
         del rt_interp, scalar
 
-    return accumulated
+    return accumulated, rt_baseline
 
 
 def main() -> None:
@@ -275,7 +296,7 @@ def main() -> None:
             )
             grad_res_type_full = rt_result["grad_res_type"]
         elif method == "ig":
-            grad_res_type_full = _ig_res_type(
+            grad_res_type_full, rt_baseline_tensor = _ig_res_type(
                 model, input_feature_dict, score, x_pred,
                 baseline_name=args.baseline, m_steps=args.m_steps,
                 n_cycle=args.n_cycle,
@@ -302,6 +323,35 @@ def main() -> None:
 
     f_baseline_val = float("nan")
     comp_err = float("nan")
+    ig_sum_val = float("nan")
+
+    if method == "ig" and res_type_grad_enabled:
+        with torch.no_grad():
+            f_baseline_val = float(confidence_forward(
+                model, rt_baseline_tensor.detach().float(),
+                input_feature_dict, x_pred, score,
+                n_cycle=args.n_cycle, gradient_checkpointing=False,
+            ))
+        log.info("f(baseline) = %.6f", f_baseline_val)
+
+        rt_x_np = input_feature_dict["restype"].detach().cpu().float().numpy()
+        if rt_x_np.ndim == 3:
+            rt_x_np = rt_x_np[0]
+        rt_bl_np = rt_baseline_tensor.detach().cpu().float().numpy()
+        if rt_bl_np.ndim == 3:
+            rt_bl_np = rt_bl_np[0]
+        ig_attribution = (rt_x_np.astype(np.float64) - rt_bl_np.astype(np.float64)) * grad_res_type_full
+        ig_sum_val = float(ig_attribution.sum())
+
+        comp_err = completeness_error_from_sum(
+            ig_sum_val, f_x_val, f_baseline_val,
+        )
+
+        log.info(
+            "Completeness error: %.4f (%.2f%%) — %s 5%% criterion",
+            comp_err, comp_err * 100,
+            "PASSES" if comp_err < 0.05 else "FAILS",
+        )
 
     # --- 6. ipTM argmax ---
     argmax_record: dict = {}
@@ -330,6 +380,7 @@ def main() -> None:
         "f_x": np.float64(f_x_val),
         "f_baseline": np.float64(f_baseline_val),
         "completeness_error": np.float64(comp_err),
+        "ig_sum": np.float64(ig_sum_val),
         "reference_seq": np.array(reference_seq),
         "chain": np.array(chain),
         "score": np.array(score),
@@ -385,6 +436,10 @@ def main() -> None:
             "msa_depth": args.msa_depth,
             **numerics_arm(),
             "coords_abs_max": _coords_max,
+            "f_x": f_x_val,
+            "f_baseline": f_baseline_val,
+            "completeness_error": comp_err,
+            "ig_sum": ig_sum_val,
         },
     )
     log.info("Done.")
