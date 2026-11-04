@@ -3249,3 +3249,101 @@ Like-for-like against |ddG|: sec14 simplex +0.4683 / +0.1714 / -0.3396 /
 +0.0422 (mean +0.2519, p=0.18). Complex ordering is preserved (rho +0.80);
 1JTG triples; 2JEL's anti-predictive -0.34 relaxes to a flat -0.03. The
 four-complex t-test still misses 0.05, so section 14's headline verdict stands.
+
+---
+
+## 27. IG's top-k blind spot: cysteine, where cysteine matters. 2026-11-04
+
+Every A-vs-B number in this project so far is a **whole-ranking** Spearman. Nobody
+had asked the question a practitioner actually asks: *does IG find the same top
+hits as the scan?* It does not, and the way it fails is specific enough to be
+worth chasing.
+
+Computed on CPU from the existing npz + scan CSVs, same `_extract_attribution`
+pairing `24_faithfulness.py` uses, so these reproduce the section 26 rhos exactly.
+
+### Top-k overlap, IG vs scan
+
+| complex | n | rho | top-10 | top-25 | top-50 | chance@50 | scan #1 at IG rank |
+|---|---|---|---|---|---|---|---|
+| 1JTG | 532 | +0.668 | 1/10 | 11/25 | 27/50 | ~4.7 | 159 |
+| 3S9D | 950 | +0.594 | 0/10 | 4/25 | 18/50 | ~2.6 | **897 / 950** |
+| 3HFM | 285 | +0.405 | 2/10 | 8/25 | 18/50 | ~8.8 | 8 |
+| 2JEL | 608 | +0.404 | 5/10 | 8/25 | 19/50 | ~4.1 | 4 |
+
+Top-50 is 4-7x chance everywhere -- the correlation is real and it is carried by
+the bulk. The top-10 is mostly missed. **The rho and the top-k tell different
+stories, and only the rho has been reported.**
+
+Aggregating to positions (each position's worst mutation) recovers a lot:
+6/10, 2/10, 8/10, 8/10 against chance 3.6 / 2.0 / 6.7 / 3.1. On 1JTG the scan's
+biggest hits are K73 and R159 and IG ranks those *positions* highly while
+misplacing the specific substitutions. So IG is better at "which position" than
+at "which amino acid" -- the same split section 26's alanine confound warned about,
+arrived at from the other direction.
+
+### The failure is conditional on cysteine
+
+My first read of this was wrong. Pooled over all four complexes, cysteine is
+**not** the biggest effect -- proline is (median |delta| 0.0222 vs C 0.0147, C
+third behind P and W) -- and IG handles proline **better** than average
+(median IG rank percentile 0.40 against a 0.50 null). So "IG misses big effects"
+is not the story.
+
+The story is that cysteine's effect size varies by complex, and IG's grip on
+cysteine fails exactly where that effect is large:
+
+| complex | C n | med abs delta, C | med abs delta, rest | rho within C | rho within rest |
+|---|---|---|---|---|---|
+| 3S9D | 50 | 0.0257 (2.2x) | 0.0116 | **+0.042** | +0.632 |
+| 3HFM | 15 | 0.1152 (4.5x) | 0.0257 | **-0.179** | +0.478 |
+| 1JTG | 28 | 0.0153 (1.1x) | 0.0139 | +0.724 | +0.665 |
+| 2JEL | 32 | 0.0038 (0.7x) | 0.0051 | +0.274 | +0.411 |
+
+Where X->C is consequential, IG has **no signal on it at all** (3S9D) or is mildly
+**anti**-predictive (3HFM), while retaining +0.63 / +0.48 on everything else in
+the same run. Where X->C is ordinary, IG tracks it as well as anything else.
+
+Scan top-10 composition makes the same point: 3S9D is `CCCCCCDFPY` and 3HFM is
+`CCCCCCCCQV`, both with median IG percentile 0.50 -- pure chance. 1JTG
+(`AADDEEEIPV`) and 2JEL (`FFGPPPPPTW`) have essentially no cysteine and median
+percentiles of 0.10 and 0.03 -- IG nails them.
+
+### Why this is a plausible mechanism, and how to kill it
+
+This is the **resswap** scan (section 2.3): only `res_type[pos]` changes, with
+coordinates, atom features and MSA held at wild type. A cysteine token therefore
+lands in a structure with no disulfide partner and no thiol geometry -- a
+sequence-structure inconsistency. A large `complex_pde` response to that is
+believable. IG integrates from a `mean_aa` baseline along a straight line in
+one-hot space, and a response that only switches on near the cysteine vertex is
+exactly what a path-integrated gradient from a smeared baseline would miss.
+
+**Untested.** Candidate checks, cheapest first:
+1. Does a WT->mutant path IG (rather than mean_aa->WT) recover the cysteine
+   hits? If yes, the baseline is the problem, not IG.
+2. Do the 3S9D / 3HFM cysteine positions sit near existing cysteines or
+   disulfides? That would support the mechanism directly.
+3. Does the same blind spot appear on the refeaturise scan, where the mutant
+   actually gets cysteine atom features?
+
+### Caveats
+
+1. **3HFM's C cell is n=15**, and 3HFM already fails the 5% completeness gate at
+   m=32 (11.14%, section 25). Its -0.179 is the weakest number in the table.
+   3S9D (n=50, m=64, completeness 0.24%) is the load-bearing one.
+2. 1JTG and 3S9D are m=64; 3HFM and 2JEL are m=32 only. Step count is confounded
+   with complex throughout this table.
+3. Top-k overlap is a harsh metric by construction -- with n~500-950, small rank
+   perturbations move members in and out of a 10-element set. The position-level
+   aggregation is the fairer read.
+4. This says nothing about the lab. It is an A-vs-B statement: where IG does and
+   does not reproduce **the model's own** scan.
+
+### Why it matters beyond a caveat
+
+For the SAE phase (`docs/SAE_RESEARCH.md`), this is a ready-made test with a known
+answer IG gets wrong. If a concept-level explanation can account for the 3S9D
+cysteine hits that residue-level IG ranks 897th of 950, that is a sharper result
+than matching IG's +0.518 -- it is a case where the concept view sees something
+the gradient view cannot.
