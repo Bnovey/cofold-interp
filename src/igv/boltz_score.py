@@ -2558,6 +2558,7 @@ def confidence_forward(
     recycling_steps: int = 1,
     autocast_dtype: str | None = None,
     triangle_attention_chunk_checkpointing: bool | None = None,
+    activation_callback=None,
 ):
     """Run the full trunk from ``s_inputs``, then the confidence head.
 
@@ -2728,6 +2729,8 @@ def confidence_forward(
     # two near-identical block runners is how the two paths drift apart. The
     # live path is _pairformer_group_fn, called from the loop below.)
 
+    _recycle_counter = [0]
+
     def _pairformer_group_fn(s_, z_, mask_, pair_mask_, span):
         """Run pairformer layers [span[0], span[1]) as ONE checkpoint unit."""
         start, stop = int(span[0].item()), int(span[1].item())
@@ -2740,6 +2743,10 @@ def confidence_forward(
                 s_, z_, mask_, pair_mask_, _profile["pf_chunk"],
                 _use_kernels, False, _use_cuequiv_attn,
             )
+            if activation_callback is not None:
+                cb_result = activation_callback(_recycle_counter[0], i, s_, z_)
+                if cb_result is not None:
+                    s_, z_ = cb_result
         return s_, z_
 
     def _msa_block_fn(z_, m_, token_mask_, msa_mask_, layer_idx_dummy):
@@ -2799,7 +2806,8 @@ def confidence_forward(
         s_ = torch.zeros_like(s_init)
         z_ = torch.zeros_like(z_init)
 
-        for _ in range(recycling_steps + 1):
+        for _recycle_i in range(recycling_steps + 1):
+            _recycle_counter[0] = _recycle_i
             s_ = s_init + model.s_recycle(model.s_norm(s_))
             z_ = z_init + model.z_recycle(model.z_norm(z_))
 
@@ -2820,6 +2828,16 @@ def confidence_forward(
                     s_, z_ = _checkpoint(
                         _pairformer_group_fn, s_, z_, mask, pair_mask, span,
                         use_reentrant=False,
+                    )
+            elif activation_callback is not None:
+                z_ = z_ + model.msa_module(
+                    z_, s_interp, feats, use_kernels=_use_kernels
+                )
+                for start in range(0, _n_pf_blocks, _pf_group):
+                    stop = min(start + _pf_group, _n_pf_blocks)
+                    span = torch.tensor([start, stop], device=device)
+                    s_, z_ = _pairformer_group_fn(
+                        s_, z_, mask, pair_mask, span,
                     )
             else:
                 # IGV_TRI_ATTN_KERNEL cannot reach these two module-level entry
@@ -3014,6 +3032,7 @@ def affinity_forward(
     recycling_steps: int = 1,
     autocast_dtype: str | None = None,
     triangle_attention_chunk_checkpointing: bool | None = None,
+    activation_callback=None,
 ):
     """Full-trunk forward ending at the affinity head, differentiable to ``s_inputs``.
 
@@ -3110,6 +3129,13 @@ def affinity_forward(
     _n_pf_blocks = len(model.pairformer_module.layers)
     _n_msa_blocks = model.msa_module.msa_blocks
 
+    # Activations captured here come from the main trunk's Pairformer,
+    # NOT the affinity module's own Pairformer stack. The affinity module's
+    # internal Pairformer re-processes z_affinity but its layers are not
+    # indexed here. We capture at the same layer indices as confidence_forward
+    # so the two paths produce comparable activation caches.
+    _recycle_counter = [0]
+
     def _pairformer_group_fn(s_, z_, mask_, pair_mask_, span):
         start, stop = int(span[0].item()), int(span[1].item())
         for i in range(start, stop):
@@ -3117,6 +3143,10 @@ def affinity_forward(
                 s_, z_, mask_, pair_mask_, _profile["pf_chunk"],
                 _use_kernels, False, _use_cuequiv_attn,
             )
+            if activation_callback is not None:
+                cb_result = activation_callback(_recycle_counter[0], i, s_, z_)
+                if cb_result is not None:
+                    s_, z_ = cb_result
         return s_, z_
 
     def _msa_block_fn(z_, m_, token_mask_, msa_mask_, layer_idx_dummy):
@@ -3174,7 +3204,8 @@ def affinity_forward(
         s_ = torch.zeros_like(s_init)
         z_ = torch.zeros_like(z_init)
 
-        for _ in range(recycling_steps + 1):
+        for _recycle_i in range(recycling_steps + 1):
+            _recycle_counter[0] = _recycle_i
             s_ = s_init + model.s_recycle(model.s_norm(s_))
             z_ = z_init + model.z_recycle(model.z_norm(z_))
 
@@ -3186,6 +3217,16 @@ def affinity_forward(
                     s_, z_ = _checkpoint(
                         _pairformer_group_fn, s_, z_, mask, pair_mask, span,
                         use_reentrant=False,
+                    )
+            elif activation_callback is not None:
+                z_ = z_ + model.msa_module(
+                    z_, s_interp, feats, use_kernels=_use_kernels
+                )
+                for start in range(0, _n_pf_blocks, _pf_group):
+                    stop = min(start + _pf_group, _n_pf_blocks)
+                    span = torch.tensor([start, stop], device=device)
+                    s_, z_ = _pairformer_group_fn(
+                        s_, z_, mask, pair_mask, span,
                     )
             else:
                 z_ = z_ + model.msa_module(
