@@ -153,6 +153,10 @@ def main() -> None:
     )
     parser.add_argument("--no-res-type-grad", action="store_true")
     parser.add_argument(
+        "--x-pred-cache", action=argparse.BooleanOptionalAction, default=True,
+        help="Cache predicted coordinates on disk (default: on).",
+    )
+    parser.add_argument(
         "--msa-dir", default=None,
         help=(
             "Directory with per-chain .a3m files. Accepts the Boltz layout "
@@ -184,6 +188,7 @@ def main() -> None:
         build_features,
         canonical_aa_token_indices,
         confidence_forward,
+        coord_fingerprint,
         load_model,
         numerics_arm,
         predict_structure_coords,
@@ -267,13 +272,21 @@ def main() -> None:
 
     # --- 3. Obtain x_pred ---
     if args.x_pred == "predicted":
-        x_pred = predict_structure_coords(model, input_feature_dict, configs, args.device)
+        cache_kw = (
+            dict(cache_dir=cache_dir, chains=chains, dataset=dataset)
+            if args.x_pred_cache else {}
+        )
+        x_pred = predict_structure_coords(
+            model, input_feature_dict, configs, args.device, **cache_kw,
+        )
     else:
         n_atoms = input_feature_dict["ref_pos"].shape[-2]
         x_pred = torch.zeros(1, 1, n_atoms, 3, device=args.device)
 
     _coords_max = float(x_pred.abs().max())
+    _x_pred_fp = coord_fingerprint(x_pred)
     log.info("x_pred (mode=%s), coords.abs().max()=%g", args.x_pred, _coords_max)
+    log.info("x_pred fingerprint: %s", _x_pred_fp)
 
     # --- 4. Res-type gradient ---
     token_indices = [token_map[(chain, i)] for i in range(len(reference_seq))]
@@ -417,6 +430,7 @@ def main() -> None:
             "baseline": args.baseline,
             "res_type_grad": res_type_grad_enabled,
             "x_pred_mode": args.x_pred,
+            "x_pred_cache": args.x_pred_cache,
             "msa_source": msa_source,
             "msa_depth": args.msa_depth,
             "single_seq": args.single_seq,
@@ -435,6 +449,8 @@ def main() -> None:
             "msa_source": msa_source,
             "msa_depth": args.msa_depth,
             **numerics_arm(),
+            "x_pred_cache": args.x_pred_cache,
+            "x_pred_fingerprint": _x_pred_fp,
             "coords_abs_max": _coords_max,
             "f_x": f_x_val,
             "f_baseline": f_baseline_val,

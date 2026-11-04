@@ -111,6 +111,10 @@ def main() -> None:
         help="Stop cleanly after this many seconds (default 6600, fits a 7200 s VM).",
     )
     p.add_argument("--dry-run", action="store_true", help="Plan only, no model")
+    p.add_argument(
+        "--x-pred-cache", action=argparse.BooleanOptionalAction, default=True,
+        help="Cache predicted coordinates on disk (default: on).",
+    )
     args = p.parse_args()
 
     logging.basicConfig(
@@ -209,6 +213,7 @@ def main() -> None:
         build_features,
         canonical_aa_token_indices,
         confidence_forward,
+        coord_fingerprint,
         load_model,
         numerics_arm,
         predict_structure_coords,
@@ -259,18 +264,24 @@ def main() -> None:
 
     if args.x_pred == "predicted":
         log.info("Predicting wild-type structure coordinates ...")
+        cache_kw = (
+            dict(cache_dir=cache_dir, chains=struct_chains, dataset=args.dataset)
+            if args.x_pred_cache else {}
+        )
         x_pred = predict_structure_coords(
-            model, input_feature_dict, configs, args.device,
+            model, input_feature_dict, configs, args.device, **cache_kw,
         )
     else:
         n_atoms = input_feature_dict["ref_pos"].shape[-2]
         x_pred = torch.zeros(1, 1, n_atoms, 3, device=args.device)
 
     _coords_max = float(x_pred.abs().max())
+    _x_pred_fp = coord_fingerprint(x_pred)
     log.info(
         "x_pred (mode=%s, shape %s), coords.abs().max()=%g",
         args.x_pred, list(x_pred.shape), _coords_max,
     )
+    log.info("x_pred fingerprint: %s", _x_pred_fp)
     if args.x_pred == "predicted" and _coords_max == 0.0:
         raise RuntimeError(
             "x_pred mode is 'predicted' but predicted coordinates are all zeros."
@@ -401,6 +412,7 @@ def main() -> None:
             "chain": args.chain,
             "mode": "resswap",
             "x_pred": args.x_pred,
+            "x_pred_cache": args.x_pred_cache,
             "n_cycle": args.n_cycle,
             "msa_source": msa_source,
             "msa_depth": args.msa_depth,
@@ -416,6 +428,8 @@ def main() -> None:
             "chain": args.chain,
             "mode": "resswap",
             "x_pred_coords_frozen": True,
+            "x_pred_cache": args.x_pred_cache,
+            "x_pred_fingerprint": _x_pred_fp,
             "wt_score": wt_score,
             **numerics_arm(),
         },

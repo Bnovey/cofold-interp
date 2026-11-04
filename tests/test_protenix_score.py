@@ -19,13 +19,17 @@ from igv.protenix_score import (
     _NUM_RESTYPE_CLASSES,
     _UNK_INDEX,
     _build_token_map,
+    _chain_cache_key,
     _compute_score_from_logits,
     _oop_msa_inference_forward,
+    _prediction_cache_key,
     build_mean_aa_res_type_baseline,
     build_shuffled_res_type_baseline,
     build_unk_res_type_baseline,
     canonical_aa_token_indices,
+    coord_fingerprint,
     numerics_arm,
+    predict_structure_coords,
 )
 
 
@@ -140,6 +144,37 @@ class TestTokenMap:
         tm = _build_token_map(ifd, chains)
         for i in range(L):
             assert ("X", i) in tm
+
+    def test_one_based_residue_index_is_normalised(self):
+        """Protenix emits residue_index 1-based, not 0-based.
+
+        Verified on 1JTG: chain A 1..262, chain B 1..165 against sequences of
+        exactly those lengths. Callers index 0-based into the reference
+        sequence, so the map must start at 0 for every chain.
+        """
+        chains = {"A": "ACDE", "B": "FGH"}
+        ifd = {
+            "asym_id": torch.tensor([0, 0, 0, 0, 1, 1, 1]),
+            "residue_index": torch.tensor([1, 2, 3, 4, 1, 2, 3]),
+        }
+        tm = _build_token_map(ifd, chains)
+        assert tm[("A", 0)] == 0
+        assert tm[("A", 3)] == 3
+        assert tm[("B", 0)] == 4
+        assert tm[("B", 2)] == 6
+        for ch, seq in chains.items():
+            for i in range(len(seq)):
+                assert (ch, i) in tm, f"missing {(ch, i)}"
+
+    def test_offset_pdb_numbering_is_normalised(self):
+        """A chain numbered from an arbitrary offset still maps from 0."""
+        chains = {"A": "ACDE"}
+        ifd = {
+            "asym_id": torch.zeros(4, dtype=torch.long),
+            "residue_index": torch.tensor([101, 102, 103, 104]),
+        }
+        tm = _build_token_map(ifd, chains)
+        assert sorted(tm.keys()) == [("A", 0), ("A", 1), ("A", 2), ("A", 3)]
 
 
 # ---------------------------------------------------------------------------
@@ -473,6 +508,172 @@ class TestScoreParityWithProtenix:
         assert abs(our.item() - ref.item()) < 1e-5, (
             f"pLDDT parity: ours={our.item()}, ref={ref.item()}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Prediction cache
+# ---------------------------------------------------------------------------
+
+
+class TestPredictionCacheKey:
+    def test_stable_for_same_inputs(self):
+        chains = {"A": "ACDE", "B": "FGH"}
+        k1 = _prediction_cache_key(chains, "1JTG")
+        k2 = _prediction_cache_key(chains, "1JTG")
+        assert k1 == k2
+
+    def test_differs_for_different_dataset(self):
+        chains = {"A": "ACDE", "B": "FGH"}
+        k1 = _prediction_cache_key(chains, "1JTG")
+        k2 = _prediction_cache_key(chains, "2XYZ")
+        assert k1 != k2
+
+    def test_differs_for_different_chains(self):
+        k1 = _prediction_cache_key({"A": "ACDE", "B": "FGH"}, "1JTG")
+        k2 = _prediction_cache_key({"A": "ACDE", "B": "FGI"}, "1JTG")
+        assert k1 != k2
+
+    def test_differs_when_sequences_swapped(self):
+        k1 = _prediction_cache_key({"A": "ACDE", "B": "FGH"}, "ds")
+        k2 = _prediction_cache_key({"A": "FGH", "B": "ACDE"}, "ds")
+        assert k1 != k2
+
+    def test_chain_cache_key_stable(self):
+        chains = {"A": "ACDE", "B": "FGH"}
+        assert _chain_cache_key(chains) == _chain_cache_key(chains)
+
+
+class TestPredictStructureCoordsCache:
+    """Cache behaviour of predict_structure_coords, using a fake model."""
+
+    @staticmethod
+    def _make_fake_model(n_atoms=20, call_counter=None):
+        model = MagicMock()
+        model.configs.model.N_cycle = 1
+
+        def _get_pairformer_output(ifd, N_cycle=1, inplace_safe=False):
+            s_in = torch.randn(1, 10, 64)
+            s = torch.randn(1, 10, 64)
+            z = torch.randn(1, 10, 10, 128)
+            return s_in, s, z
+
+        model.get_pairformer_output = _get_pairformer_output
+        model.inference_noise_scheduler = MagicMock(
+            return_value=torch.linspace(1, 0, 10),
+        )
+
+        def _sample_diffusion(**kwargs):
+            if call_counter is not None:
+                call_counter.append(1)
+            return torch.randn(1, 1, n_atoms, 3)
+
+        model.sample_diffusion = _sample_diffusion
+        model.diffusion_module = MagicMock()
+        return model
+
+    @staticmethod
+    def _make_ifd(n_atoms=20):
+        return {
+            "ref_pos": torch.randn(1, n_atoms, 3),
+            "restype": torch.randn(1, 10, 32),
+        }
+
+    def test_round_trip_save_load(self, tmp_path):
+        counter = []
+        model = self._make_fake_model(call_counter=counter)
+        ifd = self._make_ifd()
+
+        x1 = predict_structure_coords(
+            model, ifd, None, "cpu",
+            cache_dir=tmp_path, chains={"A": "ACDE"}, dataset="test",
+        )
+        assert len(counter) == 1
+        cached_path = tmp_path / "predicted_coords"
+        assert cached_path.exists()
+
+        x2 = predict_structure_coords(
+            model, ifd, None, "cpu",
+            cache_dir=tmp_path, chains={"A": "ACDE"}, dataset="test",
+        )
+        assert len(counter) == 1
+        assert torch.equal(x1, x2)
+
+    def test_wrong_atom_count_triggers_repredict(self, tmp_path):
+        counter = []
+        model = self._make_fake_model(n_atoms=20, call_counter=counter)
+        ifd_20 = self._make_ifd(n_atoms=20)
+
+        predict_structure_coords(
+            model, ifd_20, None, "cpu",
+            cache_dir=tmp_path, chains={"A": "ACDE"}, dataset="test",
+        )
+        assert len(counter) == 1
+
+        ifd_30 = self._make_ifd(n_atoms=30)
+        x2 = predict_structure_coords(
+            model, ifd_30, None, "cpu",
+            cache_dir=tmp_path, chains={"A": "ACDE"}, dataset="test",
+        )
+        assert len(counter) == 2
+
+    def test_no_cache_without_args(self, tmp_path):
+        counter = []
+        model = self._make_fake_model(call_counter=counter)
+        ifd = self._make_ifd()
+
+        predict_structure_coords(model, ifd, None, "cpu")
+        predict_structure_coords(model, ifd, None, "cpu")
+        assert len(counter) == 2
+        assert not (tmp_path / "predicted_coords").exists()
+
+    def test_atomic_write_no_partial_file(self, tmp_path):
+        """Simulate a crash during torch.save -- no partial file should remain."""
+        from unittest.mock import patch
+
+        counter = []
+        model = self._make_fake_model(call_counter=counter)
+        ifd = self._make_ifd()
+
+        with patch("torch.save", side_effect=OSError("disk full")):
+            with pytest.raises(OSError, match="disk full"):
+                predict_structure_coords(
+                    model, ifd, None, "cpu",
+                    cache_dir=tmp_path, chains={"A": "ACDE"}, dataset="test",
+                )
+
+        pred_dir = tmp_path / "predicted_coords"
+        if pred_dir.exists():
+            remaining = list(pred_dir.rglob("*"))
+            pt_files = [f for f in remaining if f.suffix in (".pt", ".tmp")]
+            assert len(pt_files) == 0, f"Partial files left: {pt_files}"
+
+
+# ---------------------------------------------------------------------------
+# Coordinate fingerprint
+# ---------------------------------------------------------------------------
+
+
+class TestCoordFingerprint:
+    def test_identical_tensors(self):
+        t = torch.randn(1, 1, 20, 3)
+        fp1 = coord_fingerprint(t)
+        fp2 = coord_fingerprint(t.clone())
+        assert fp1["sha256"] == fp2["sha256"]
+        assert fp1["shape"] == fp2["shape"]
+        assert fp1["abs_max"] == fp2["abs_max"]
+
+    def test_different_tensors(self):
+        t1 = torch.randn(1, 1, 20, 3)
+        t2 = torch.randn(1, 1, 20, 3)
+        fp1 = coord_fingerprint(t1)
+        fp2 = coord_fingerprint(t2)
+        assert fp1["sha256"] != fp2["sha256"]
+
+    def test_keys(self):
+        fp = coord_fingerprint(torch.randn(1, 1, 10, 3))
+        assert "sha256" in fp
+        assert "shape" in fp
+        assert "abs_max" in fp
 
 
 @_requires_gpu

@@ -497,13 +497,26 @@ def _build_token_map(
         else:
             asym_to_label[int(a)] = str(int(a))
 
+    # Protenix emits ``residue_index`` 1-based: verified on 1JTG, where chain A
+    # runs 1..262 and chain B runs 1..165 against sequences of exactly those
+    # lengths. Callers look up 0-based offsets into the reference sequence, so
+    # normalise by each chain's own minimum. Subtracting the per-chain minimum
+    # rather than a hard-coded 1 keeps this correct if Protenix ever emits
+    # 0-based indices or genuine PDB numbering with an offset.
+    chain_min: dict[int, int] = {}
+    if residue_index is not None:
+        for tok_idx in range(len(asym_id)):
+            a = int(asym_id[tok_idx])
+            r = int(residue_index[tok_idx])
+            chain_min[a] = r if a not in chain_min else min(chain_min[a], r)
+
     token_map: dict[tuple[str, int], int] = {}
     chain_counters: dict[int, int] = {}
     for tok_idx in range(len(asym_id)):
         a = int(asym_id[tok_idx])
         chain_label = asym_to_label.get(a, str(a))
         if residue_index is not None:
-            resi = int(residue_index[tok_idx])
+            resi = int(residue_index[tok_idx]) - chain_min[a]
         else:
             count = chain_counters.get(a, 0)
             resi = count
@@ -806,13 +819,93 @@ def build_shuffled_res_type_baseline(res_type, input_feature_dict, seed=0):
 
 
 # ---------------------------------------------------------------------------
+# Cache-key helpers
+# ---------------------------------------------------------------------------
+
+
+def _chain_cache_key(chains: dict[str, str]) -> str:
+    """Deterministic key encoding chain set identity (same logic as boltz_score)."""
+    import hashlib
+
+    lengths = "_".join(f"{cid}{len(seq)}" for cid, seq in sorted(chains.items()))
+    payload = "|".join(f"{cid}:{seq}" for cid, seq in sorted(chains.items()))
+    digest = hashlib.sha256(payload.encode()).hexdigest()[:8]
+    return f"{lengths}-{digest}"
+
+
+def _prediction_cache_key(chains: dict[str, str], dataset: str) -> str:
+    return f"{dataset}_{_chain_cache_key(chains)}"
+
+
+def coord_fingerprint(tensor) -> dict[str, Any]:
+    """Stable fingerprint of a coordinate tensor for provenance comparison."""
+    import hashlib
+    import torch
+
+    t = tensor.detach().cpu().float()
+    rounded = torch.round(t * 1e6) / 1e6
+    h = hashlib.sha256(rounded.numpy().tobytes()).hexdigest()
+    return {
+        "sha256": h,
+        "shape": list(t.shape),
+        "abs_max": float(t.abs().max()),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Fixed-coordinate injection
 # ---------------------------------------------------------------------------
 
 
-def predict_structure_coords(model, input_feature_dict, configs, device, n_sample=1):
-    """Run one prediction without gradients and return detached coords."""
+def predict_structure_coords(
+    model,
+    input_feature_dict,
+    configs,
+    device,
+    n_sample=1,
+    *,
+    cache_dir=None,
+    chains=None,
+    dataset=None,
+):
+    """Run one prediction without gradients and return detached coords.
+
+    When ``cache_dir``, ``chains``, and ``dataset`` are all supplied, the
+    result is cached on disk at ``cache_dir / "predicted_coords" / key /
+    "x_pred.pt"`` and reused on subsequent calls.  The cache validates that
+    the stored tensor's atom count matches ``input_feature_dict["ref_pos"]``.
+    """
+    import tempfile
+
     import torch
+
+    _use_cache = cache_dir is not None and chains is not None and dataset is not None
+
+    if _use_cache:
+        cache_key = _prediction_cache_key(chains, dataset)
+        pred_dir = Path(cache_dir) / "predicted_coords" / cache_key
+        cached_path = pred_dir / "x_pred.pt"
+        expected_n_atoms = int(input_feature_dict["ref_pos"].shape[-2])
+
+        if cached_path.exists():
+            log.info("Loading cached predicted coords from %s", cached_path)
+            x_pred = torch.load(
+                cached_path,
+                map_location=device if isinstance(device, str) else str(device),
+                weights_only=True,
+            )
+            if x_pred.shape[-2] != expected_n_atoms:
+                log.warning(
+                    "Cached x_pred has %d atoms but feats expects %d; "
+                    "re-predicting.",
+                    x_pred.shape[-2], expected_n_atoms,
+                )
+            else:
+                log.info(
+                    "Cached x_pred validated: shape %s, abs max %.6g",
+                    list(x_pred.shape), float(x_pred.abs().max()),
+                )
+                return x_pred
 
     with torch.no_grad():
         s_inputs, s, z = model.get_pairformer_output(
@@ -840,7 +933,26 @@ def predict_structure_coords(model, input_feature_dict, configs, device, n_sampl
             inplace_safe=False,
             enable_efficient_fusion=False,
         )
-    return coords.detach()
+
+    x_pred = coords.detach()
+
+    if _use_cache:
+        pred_dir.mkdir(parents=True, exist_ok=True)
+        log.info(
+            "Structure prediction complete: x_pred shape %s, abs max %.6g",
+            list(x_pred.shape), float(x_pred.abs().max()),
+        )
+        fd, tmp = tempfile.mkstemp(dir=str(pred_dir), suffix=".tmp")
+        try:
+            os.close(fd)
+            torch.save(x_pred, tmp)
+            os.replace(tmp, cached_path)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
+        log.info("Cached predicted coords at %s", cached_path)
+
+    return x_pred
 
 
 # ---------------------------------------------------------------------------
@@ -905,11 +1017,38 @@ def confidence_forward(
         return scalar
 
     if gradient_checkpointing:
-        scalar = _checkpoint(
-            _full_trunk_and_confidence, restype, use_reentrant=True,
+        # NEITHER checkpoint flavour is usable on this path, so we run without
+        # one. This differs deliberately from boltz_score.py, where the outer
+        # reentrant checkpoint IS load-bearing for memory.
+        #
+        #   use_reentrant=True  -- returns a numerically identical scalar whose
+        #     .requires_grad is True, but ``restype.grad`` comes back None. The
+        #     gradient is silently lost; the only thing that catches it is
+        #     res_type_gradient_forward's explicit None check. Measured on 1JTG
+        #     (427 tokens, n_cycle=1, complex_pde): score 9.585430 both ways,
+        #     grad None reentrant vs 233.2586 without.
+        #     Boltz escapes this because its gradient target is s_inputs with
+        #     per-block non-reentrant checkpoints nested inside; here the target
+        #     is the restype leaf handed straight to the checkpoint, which is
+        #     the case reentrant does not propagate to.
+        #
+        #   use_reentrant=False -- raises CheckpointError: "A different number
+        #     of tensors was saved during the original forward and
+        #     recomputation." Protenix's trunk is not reproducible between the
+        #     forward and the recompute. determinism_check="none" would silence
+        #     that, but suppressing a real recompute mismatch risks silently
+        #     WRONG gradients, which is worse than no checkpointing.
+        #
+        # Memory does not force the issue: measured peak is 35.14 GiB at
+        # n_cycle=4 on 1JTG (427 tokens), inside an 80 GB A100. Re-measure
+        # before trusting this on markedly larger complexes.
+        log.warning(
+            "gradient_checkpointing=True requested but is unusable on the "
+            "Protenix path (reentrant silently drops the restype gradient; "
+            "non-reentrant fails its determinism check). Running without it; "
+            "measured peak 35.14 GiB at n_cycle=4 on 1JTG."
         )
-    else:
-        scalar = _full_trunk_and_confidence(restype)
+    scalar = _full_trunk_and_confidence(restype)
 
     model.confidence_head.stop_gradient = orig_sg
 
