@@ -115,6 +115,10 @@ def main() -> None:
         "--x-pred-cache", action=argparse.BooleanOptionalAction, default=True,
         help="Cache predicted coordinates on disk (default: on).",
     )
+    p.add_argument(
+        "--feature-cache", action=argparse.BooleanOptionalAction, default=True,
+        help="Cache feature dict on disk for cross-process reproducibility (default: on).",
+    )
     args = p.parse_args()
 
     logging.basicConfig(
@@ -247,11 +251,15 @@ def main() -> None:
     log.info("MSA source: %s (depth=%s)", msa_source, args.msa_depth or "default")
 
     feat_cache = cache_dir / "protenix_scan" / f"{args.dataset}_{args.chain}"
-    log.info("Building Protenix features (cache=%s)", feat_cache)
+    log.info("Building Protenix features (cache=%s, feature_cache=%s)", feat_cache, args.feature_cache)
     input_feature_dict, token_map = build_features(
         struct_chains, feat_cache, args.device, configs, model=model,
         msa_paths=msa_paths, msa_depth=args.msa_depth,
+        use_feature_cache=args.feature_cache, model_name=args.model_name,
+        feature_cache_dir=cache_dir / "protenix_features",
     )
+    _ref_pos_fp = coord_fingerprint(input_feature_dict["ref_pos"])
+    log.info("ref_pos fingerprint: %s", _ref_pos_fp)
 
     for i in range(len(reference_seq)):
         if (args.chain, i) not in token_map:
@@ -413,6 +421,7 @@ def main() -> None:
             "mode": "resswap",
             "x_pred": args.x_pred,
             "x_pred_cache": args.x_pred_cache,
+            "feature_cache": args.feature_cache,
             "n_cycle": args.n_cycle,
             "msa_source": msa_source,
             "msa_depth": args.msa_depth,
@@ -429,7 +438,9 @@ def main() -> None:
             "mode": "resswap",
             "x_pred_coords_frozen": True,
             "x_pred_cache": args.x_pred_cache,
+            "feature_cache": args.feature_cache,
             "x_pred_fingerprint": _x_pred_fp,
+            "ref_pos_fingerprint": _ref_pos_fp,
             "wt_score": wt_score,
             **numerics_arm(),
         },

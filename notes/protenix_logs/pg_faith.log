@@ -1,0 +1,28 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.6.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+WARNING: The NVIDIA Driver was not detected.  GPU functionality will not be available.
+   Use the NVIDIA Container Toolkit to start this container with GPU support; see
+   https://docs.nvidia.com/datacenter/cloud-native/ .
+
+2026-11-06 04:28:12,704 INFO Matched 532 mutations between attribution and scan
+2026-11-06 04:28:15,000 INFO Spearman = 0.2358 [0.1586, 0.3145]
+2026-11-06 04:28:15,000 INFO Pearson  = 0.2676 [0.1969, 0.3393]
+2026-11-06 04:28:21,151 INFO Permutation null: p5=-0.0703 p95=0.0710 p_two_sided=0.0000
+2026-11-06 04:28:21,152 INFO Scale ratio median|A|/median|B| = 1.7511
+2026-11-06 04:28:22,999 INFO Per-position (n=28): sum_spearman=-0.2288 max_spearman=-0.0826
+2026-11-06 04:28:26,085 INFO Partial Spearman (controlling distance_to_partner) = 0.2394
+2026-11-06 04:28:26,088 INFO Partial Spearman (all 8 confounds) = 0.1862
+2026-11-06 04:28:26,088 INFO Wrote results/1JTG_faith_fixed_pg.json

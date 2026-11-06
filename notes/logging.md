@@ -3347,3 +3347,116 @@ answer IG gets wrong. If a concept-level explanation can account for the 3S9D
 cysteine hits that residue-level IG ranks 897th of 950, that is a sharper result
 than matching IG's +0.518 -- it is a case where the concept view sees something
 the gradient view cannot.
+
+## 28. Protenix attribution was never reproducible, and `mean_aa` is why IG loses to a single gradient. 2026-11-05/06
+
+First end-to-end IG + scan on Protenix (1JTG, chain B, `complex_pde`, single-seq,
+n_cycle=4, 532 mutations). The headline is a **retraction and a fix**, not a result.
+
+### The bug: `ref_pos` was regenerated, unseeded, every process
+
+We froze the *predicted* structure last session (`x_pred` on-disk cache) and
+assumed featurisation was deterministic. It is not. Hashing every feature tensor
+across two processes with identical inputs, only two differ:
+
+| feature | shape | process A | process B |
+|---|---|---|---|
+| `ref_pos` | (3257, 3) | `3757a503a3fffb9c` | `db2cca53d9fb5425` |
+| `d_lm` | (102, 32, 128, 3) | `025531fa60714275` | `e6fc6f5a4b07411d` |
+
+`ref_pos` is the RDKit reference conformer; `d_lm` is downstream of it. Every
+other feature is byte-identical.
+
+### Why that was fatal, and invisible
+
+Within one process everything is bit-exact (4 repeated forwards and 4 repeated
+backwards, identical to all printed digits). Across processes the forward moves
+only 0.1-3%, but the backward -- 64 Pairformer layers x 4 recycles -- amplifies it:
+
+| quantity | across four separate processes |
+|---|---|
+| `g.d` at alpha=0.5 | **-1.4882, +12.57155, +3.04140, -0.26294** (two sign flips) |
+| `||g||` at alpha=1.0 | **75.74024 vs 46.89751** (38%) |
+
+A 2% forward drift became a >100% gradient swing *at the wild-type itself*. IG was
+integrating a gradient field that changed between evaluations.
+
+### Fix
+
+`build_features(use_feature_cache=True, feature_cache_dir=...)` -- atomic on-disk
+cache of the finalised feature dict (written after `generate_relp` and
+`update_input_feature_dict`), keyed on chains + msa_paths + msa_depth + model_name,
+shared by stages 03/04/05 via `data/raw/protenix_features/`. `ref_pos_fingerprint`
+now goes into every `.prov.json`, so a matched run is **verifiable, not assumed**.
+
+Verified: two fresh processes gave identical `ref_pos` (`5e0a8e15f1ffeb9b`), f,
+`g.d` (-7.59176) and `||g||` (517.61847). In the production run, IG, plain_grad
+and the scan all report `f(x) = 9.472452` and `ref_pos c987246d8eb33d2b`.
+
+A first fix attempt was incomplete: stages 03 and 04 passed *different* cache
+dirs (`protenix_attr/` vs `protenix_scan/`), so each built its own cache --
+reproducible per script, still mismatched between them, which is the pair that
+matters. Caught before any run.
+
+### RETRACTION: the pre-fix A-B numbers were artifacts
+
+| | pre-fix (mismatched `ref_pos`) | post-fix (verified matched) |
+|---|---|---|
+| IG m=32, `mean_aa` | +0.2062 [0.1182, 0.2964], p=0.0002 | **+0.0495 [-0.0293, 0.1325], p=0.26** |
+| plain_grad | +0.1176 [0.0337, 0.2020], p=0.0081 | **+0.2358 [0.1586, 0.3145], p<1e-4** |
+| completeness (IG) | 351.11% | 401.19% |
+| scale ratio median\|A\|/median\|B\| | 0.1853 | 0.2565 (IG), 1.7511 (plain_grad) |
+
+Both pre-fix numbers were wrong **and the ordering was wrong**. I had written that
+"IG beats plain_grad, doing real work over its m=1 baseline." With matched features
+the ranking reverses: **plain_grad beats IG by ~5x**, and IG's CI spans zero.
+
+I also predicted the fix would *raise* +0.206 ("a floor"). It fell to 0.050. The
+reasoning -- noise attenuates correlation, so removing noise raises it -- only holds
+for random noise around a fixed signal. Changing `ref_pos` produces a *different*
+gradient vector, not a noisier one (`||g||` 75.7 / 46.9 / 517.6 across conditions).
+
+### The determinism bug was NOT causing the completeness failure
+
+401.19% with perfectly matched, reproducible features. That isolates the cause to
+the path. Measured along `mean_aa` -> WT (||d|| = 20.1408, 8540 nonzero entries):
+
+| alpha | 0.0 | 0.1 | 0.25 | 0.5 | 0.75 | 0.9 | 1.0 |
+|---|---|---|---|---|---|---|---|
+| f | 12.176787 | 11.420660 | 9.695648 | **9.955785** | 9.549372 | **9.682346** | 9.460993 |
+
+Non-monotone, reversing direction at least three times. A finite-difference h-sweep
+never converges (at alpha=0.5: 4.42, -5.40, -3.73, -5.78, -8.82, -15.61 as h shrinks),
+so the path is rough at every scale tested.
+
+**Mechanism.** 31 of 32 Gauss-Legendre nodes sit at alpha<1, inside a region where
+every residue is a 20-way uniform smear -- a protein the model never saw. Those
+gradients are noise and they swamp the one meaningful region near alpha=1. Hence
+both the 401% completeness error and the collapse to +0.050. The gradient is
+informative; the `mean_aa` path destroys it.
+
+### This confirms section 27's registered prediction
+
+Section 27 listed, as the cheapest falsification of the cysteine blind spot:
+"Does a WT->mutant path IG (rather than mean_aa->WT) recover the cysteine hits?
+If yes, the baseline is the problem, not IG." The baseline is the problem,
+established here on independent grounds.
+
+`scripts/05_ig_mutation_paths.py` (new) implements per-mutation paths:
+`wt_to_mut` and `null_to_mut` (`--null-mode {unk,zeros}`), changing only the
+mutated row. In `wt_to_mut`, `f(input) - f(baseline)` IS the scan's delta, so
+**completeness becomes checkable against ground truth per mutation** -- impossible
+under `mean_aa`. Not yet run.
+
+### Caveats
+
+1. **One complex, one chain, one score.** 1JTG/B, `complex_pde`. No replication.
+2. **Single-sequence.** No MSAs exist for Protenix (lost with the us-central1-a
+   disk). Protenix deltas are ~10x Boltz's (median |delta| ~0.2 vs 0.014), almost
+   certainly because without an MSA the model leans entirely on sequence. The
+   Boltz +0.518 comparison is therefore confounded by MSA setting as well as model.
+3. **`mean_aa` m=32 only.** Boltz used m=64 on 1JTG. Step count is not controlled.
+4. **Boltz has never had this stability check run.** Its +0.518, and the SAE phase
+   resting on it, used the same attribution machinery on an equally deep model.
+   Boltz has a separate featurisation path so it may well be clean -- but that is
+   exactly what we assumed about Protenix.

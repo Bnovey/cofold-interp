@@ -1,0 +1,105 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.6.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+23:21:04 __main__ INFO SKEMPI complex 1jtg (chain=B)
+23:21:04 __main__ INFO Complex chains: {'A': 262, 'B': 165}
+23:21:04 __main__ INFO Loading Protenix model (protenix_base_default_v1.0.0)
+2026-11-05 23:22:32,718 [/app/src/igv/protenix_score.py:288] INFO igv.protenix_score: Protenix protenix_base_default_v1.0.0 loaded (protenix_base_default_v1.0.0.pt)
+2026-11-05 23:22:32,753 [/app/scripts/03_attribute_protenix.py:268] INFO __main__: MSA source: single_seq (depth=default)
+2026-11-05 23:22:32,753 [/app/scripts/03_attribute_protenix.py:271] INFO __main__: Building Protenix features (cache=data/raw/protenix_attr/1JTG_B, feature_cache=True)
+2026-11-05 23:22:33,031 [/usr/local/lib/python3.11/dist-packages/protenix/data/inference/infer_dataloader.py:283] INFO protenix.data.inference.infer_dataloader: Featurizing complex...
+2026-11-05 23:22:45,124 [/usr/local/lib/python3.11/dist-packages/protenix/data/constraint/constraint_featurizer.py:392] INFO protenix.data.constraint.constraint_featurizer: Loaded constraint feature: #atom contact:0 #contact:0 #pocket:0
+2026-11-05 23:22:45,233 [/usr/local/lib/python3.11/dist-packages/protenix/data/template/template_featurizer.py:684] INFO protenix.data.template.template_featurizer: Calling InferenceTemplateFeaturizer.make_template_feature
+2026-11-05 23:22:45,737 [/app/src/igv/protenix_score.py:518] INFO igv.protenix_score: Features built: ref_pos shape [3257, 3], fingerprint c987246d8eb33d2b
+2026-11-05 23:22:46,920 [/app/src/igv/protenix_score.py:533] INFO igv.protenix_score: Cached features at data/raw/protenix_features/A262_B165-f606f983_nomsa_protenix_base_default_v1.0.0/features.pt
+2026-11-05 23:22:46,931 [/app/scripts/03_attribute_protenix.py:279] INFO __main__: ref_pos fingerprint: {'sha256': 'c987246d8eb33d2bca60459f57e09a1b7586fb98b5220d6f3d45bdd98ef2629e', 'shape': [3257, 3], 'abs_max': 5.319520473480225}
+2026-11-05 23:22:46,931 [/app/src/igv/protenix_score.py:989] INFO igv.protenix_score: Loading cached predicted coords from data/raw/predicted_coords/1JTG_A262_B165-f606f983/x_pred.pt
+2026-11-05 23:22:46,941 [/app/src/igv/protenix_score.py:1002] INFO igv.protenix_score: Cached x_pred validated: shape [1, 3257, 3], abs max 29.1609
+2026-11-05 23:22:46,942 [/app/scripts/03_attribute_protenix.py:296] INFO __main__: x_pred (mode=predicted), coords.abs().max()=29.1609
+2026-11-05 23:22:46,942 [/app/scripts/03_attribute_protenix.py:297] INFO __main__: x_pred fingerprint: {'sha256': 'c777aa4dec8cea3aed0cf6cbb1eae8e71d7535470f7ea4c8c39c645367141164', 'shape': [1, 3257, 3], 'abs_max': 29.160888671875}
+2026-11-05 23:22:46,942 [/app/scripts/03_attribute_protenix.py:305] INFO __main__: Computing restype gradient (method=ig)
+2026-11-05 23:22:46,998 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 1/32
+2026-11-05 23:22:47,328 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:23:24,009 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 2/32
+2026-11-05 23:23:24,018 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:23:59,414 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 3/32
+2026-11-05 23:23:59,445 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:24:34,846 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 4/32
+2026-11-05 23:24:34,874 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:25:10,270 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 5/32
+2026-11-05 23:25:10,281 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:26:11,520 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 6/32
+2026-11-05 23:26:11,530 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:27:30,799 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 7/32
+2026-11-05 23:27:30,813 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:28:50,027 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 8/32
+2026-11-05 23:28:50,056 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:30:09,274 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 9/32
+2026-11-05 23:30:09,284 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:31:28,719 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 10/32
+2026-11-05 23:31:28,745 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:32:47,953 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 11/32
+2026-11-05 23:32:47,962 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:34:07,160 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 12/32
+2026-11-05 23:34:07,187 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:35:26,413 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 13/32
+2026-11-05 23:35:26,440 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:36:45,687 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 14/32
+2026-11-05 23:36:45,697 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:38:04,931 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 15/32
+2026-11-05 23:38:04,940 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:39:24,171 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 16/32
+2026-11-05 23:39:24,183 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:40:43,410 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 17/32
+2026-11-05 23:40:43,435 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:42:02,664 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 18/32
+2026-11-05 23:42:02,694 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:43:21,914 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 19/32
+2026-11-05 23:43:21,923 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:44:41,158 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 20/32
+2026-11-05 23:44:41,167 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:46:00,415 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 21/32
+2026-11-05 23:46:00,425 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:47:19,626 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 22/32
+2026-11-05 23:47:19,654 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:48:38,889 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 23/32
+2026-11-05 23:48:38,919 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:49:58,156 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 24/32
+2026-11-05 23:49:58,168 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:51:17,410 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 25/32
+2026-11-05 23:51:17,419 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:52:36,645 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 26/32
+2026-11-05 23:52:36,675 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:53:55,916 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 27/32
+2026-11-05 23:53:55,940 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:55:15,159 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 28/32
+2026-11-05 23:55:15,185 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:56:34,417 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 29/32
+2026-11-05 23:56:34,444 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:57:53,660 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 30/32
+2026-11-05 23:57:53,686 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-05 23:59:12,921 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 31/32
+2026-11-05 23:59:12,930 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-06 00:00:32,192 [/app/scripts/03_attribute_protenix.py:99] INFO __main__: restype IG step 32/32
+2026-11-06 00:00:32,201 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-06 00:01:51,421 [/app/scripts/03_attribute_protenix.py:334] INFO __main__: restype gradient: shape (165, 32) in 2344.5 s
+2026-11-06 00:02:10,894 [/app/scripts/03_attribute_protenix.py:343] INFO __main__: f(x) = 9.472452
+2026-11-06 00:02:30,242 [/app/scripts/03_attribute_protenix.py:356] INFO __main__: f(baseline) = 12.150003
+2026-11-06 00:02:30,243 [/app/scripts/03_attribute_protenix.py:371] INFO __main__: Completeness error: 4.0119 (401.19%) — FAILS 5% criterion
+2026-11-06 00:02:30,246 [/app/scripts/03_attribute_protenix.py:420] INFO __main__: Wrote results/1JTG_complex_pde_ig_protenix_grad.npz
+2026-11-06 00:02:30,257 [/app/scripts/03_attribute_protenix.py:472] INFO __main__: Done.
+train scheduler 16.0
+inference scheduler 16.0
+Diffusion Module has 16.0

@@ -1,0 +1,77 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.6.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+2026-11-05 22:53:28,757 [/app/src/igv/protenix_score.py:288] INFO igv.protenix_score: Protenix protenix_base_default_v1.0.0 loaded (protenix_base_default_v1.0.0.pt)
+2026-11-05 22:53:29,069 [/usr/local/lib/python3.11/dist-packages/protenix/data/inference/infer_dataloader.py:283] INFO protenix.data.inference.infer_dataloader: Featurizing complex...
+2026-11-05 22:53:41,232 [/usr/local/lib/python3.11/dist-packages/protenix/data/constraint/constraint_featurizer.py:392] INFO protenix.data.constraint.constraint_featurizer: Loaded constraint feature: #atom contact:0 #contact:0 #pocket:0
+2026-11-05 22:53:41,353 [/usr/local/lib/python3.11/dist-packages/protenix/data/template/template_featurizer.py:684] INFO protenix.data.template.template_featurizer: Calling InferenceTemplateFeaturizer.make_template_feature
+train scheduler 16.0
+inference scheduler 16.0
+Diffusion Module has 16.0
+=== FEATURE HASHES ===
+  asym_id                      (427,)                 torch.int64      8cad6b69f85115e6
+  atom_to_tokatom_idx          (3257,)                torch.int64      01fea5527300db0e
+  atom_to_token_idx            (3257,)                torch.int64      9e8348c041d50f0b
+  bond_mask                    (3257, 3257)           torch.int64      44871711250d2183
+  d_lm                         (102, 32, 128, 3)      torch.float32    e6fc6f5a4b07411d
+  deletion_matrix              (1, 427)               torch.int8       e3b6c03d101896b1
+  deletion_mean                (427,)                 torch.float32    a8926df42a33a241
+  deletion_value               (1, 427)               torch.float32    a8926df42a33a241
+  distogram_rep_atom_mask      (3257,)                torch.int64      729564e2df67ba8e
+  entity_id                    (427,)                 torch.int64      8cad6b69f85115e6
+  entity_mol_id                (3257,)                torch.int64      ab2d2b6ff84deb50
+  frame_atom_index             (427, 3)               torch.int64      5aa0f1ae3beed485
+  has_deletion                 (1, 427)               torch.float32    a8926df42a33a241
+  has_frame                    (427,)                 torch.int64      b910980ed00fe764
+  is_dna                       (3257,)                torch.int64      b33f1dbc7757469b
+  is_ligand                    (3257,)                torch.int64      b33f1dbc7757469b
+  is_protein                   (3257,)                torch.int64      5a77e1afb0aabde3
+  is_rna                       (3257,)                torch.int64      b33f1dbc7757469b
+  modified_res_mask            (3257,)                torch.int64      b33f1dbc7757469b
+  mol_atom_index               (3257,)                torch.int64      3e840b44c21ec342
+  mol_id                       (3257,)                torch.int64      ab2d2b6ff84deb50
+  msa                          (1, 427)               torch.int64      eff0128f26937801
+  msa_mask                     (1, 427)               torch.bool       8d5f8cbd2b08e86e
+  pae_rep_atom_mask            (3257,)                torch.int64      b1c994edfe34f9da
+  plddt_m_rep_atom_mask        (3257,)                torch.int64      b1c994edfe34f9da
+  profile                      (427, 32)              torch.float32    89a6fdc2ecaa995b
+  prot_pair_num_alignments     ()                     torch.int64      7c9fa136d4413fa6
+  prot_paired_num_alignments   ()                     torch.int64      7c9fa136d4413fa6
+  prot_unpair_num_alignments   ()                     torch.int64      7c9fa136d4413fa6
+  prot_unpaired_num_alignments ()                     torch.int64      7c9fa136d4413fa6
+  ref_atom_name_chars          (3257, 4, 64)          torch.int64      a940a4b88130f643
+  ref_charge                   (3257,)                torch.int64      97b02ab9bf6fb180
+  ref_element                  (3257, 128)            torch.int64      7ac2e951917f11a3
+  ref_mask                     (3257,)                torch.int64      5a77e1afb0aabde3
+  ref_pos                      (3257, 3)              torch.float32    db2cca53d9fb5425
+  ref_space_uid                (3257,)                torch.int64      9e8348c041d50f0b
+  relp                         (427, 427, 139)        torch.float32    87afc4fcf4f098b9
+  residue_index                (427,)                 torch.int64      6fb109b0cd0499ce
+  resolution                   (1,)                   torch.float32    c68830a25204a09f
+  restype                      (427, 32)              torch.float32    89a6fdc2ecaa995b
+  rna_pair_num_alignments      ()                     torch.int64      7c9fa136d4413fa6
+  rna_unpair_num_alignments    ()                     torch.int64      7c9fa136d4413fa6
+  rna_unpaired_num_alignments  ()                     torch.int64      7c9fa136d4413fa6
+  sym_id                       (427,)                 torch.int64      8e47c99fbde897f7
+  template_aatype              (4, 427)               torch.int64      57d7bfca8f427ce3
+  template_atom_mask           (4, 427, 24)           torch.bool       55e1fd6d8fa445db
+  template_atom_positions      (4, 427, 24, 3)        torch.float32    6a667804e7eaaac6
+  template_backbone_frame_mask (4, 427, 427)          torch.float32    c287fea4e669074f
+  template_distogram           (4, 427, 427, 39)      torch.float32    0444c1ea7f59cc44
+  template_pseudo_beta_mask    (4, 427, 427)          torch.float32    c287fea4e669074f
+  template_unit_vector         (4, 427, 427, 3)       torch.float32    8665bdc589e8cc13
+  token_bonds                  (427, 427)             torch.float32    d65f49580f9e921c
+  token_index                  (427,)                 torch.int64      876e5751c9daf7e9
+  v_lm                         (102, 32, 128, 1)      torch.bool       89d96942910888c7

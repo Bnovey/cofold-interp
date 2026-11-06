@@ -1,0 +1,94 @@
+{
+  "argv": [
+    "scripts/03_attribute_protenix.py",
+    "--dataset",
+    "1JTG",
+    "--chain",
+    "B",
+    "--score",
+    "complex_pde",
+    "--method",
+    "plain_grad",
+    "--n-cycle",
+    "4",
+    "--single-seq"
+  ],
+  "arm": {
+    "autocast": "off",
+    "chain": "B",
+    "completeness_error": NaN,
+    "coords_abs_max": 29.160888671875,
+    "dataset": "1JTG",
+    "dtype": "fp32",
+    "f_baseline": NaN,
+    "f_x": 9.472452163696289,
+    "feature_cache": true,
+    "ig_sum": NaN,
+    "m_steps": 1,
+    "method": "plain_grad",
+    "model": "protenix",
+    "model_name": "protenix_base_default_v1.0.0",
+    "msa_depth": null,
+    "msa_source": "single_seq",
+    "n_cycle": 4,
+    "ref_pos_fingerprint": {
+      "abs_max": 5.319520473480225,
+      "sha256": "c987246d8eb33d2bca60459f57e09a1b7586fb98b5220d6f3d45bdd98ef2629e",
+      "shape": [
+        3257,
+        3
+      ]
+    },
+    "score": "complex_pde",
+    "trunk": "full",
+    "x_pred_cache": true,
+    "x_pred_fingerprint": {
+      "abs_max": 29.160888671875,
+      "sha256": "c777aa4dec8cea3aed0cf6cbb1eae8e71d7535470f7ea4c8c39c645367141164",
+      "shape": [
+        1,
+        3257,
+        3
+      ]
+    },
+    "x_pred_mode": "predicted"
+  },
+  "created_utc": "2026-11-06T04:28:08+00:00",
+  "env": {
+    "boltz": null,
+    "cuda_available": true,
+    "gpu_count": 1,
+    "gpu_name": "NVIDIA A100-SXM4-80GB",
+    "gpu_total_gib": 79.2,
+    "hostname": "5ef68968f93f",
+    "platform": "Linux-6.8.0-1070-gcp-x86_64-with-glibc2.35",
+    "python": "3.11.18",
+    "torch": "2.7.1+cu126"
+  },
+  "git_commit": null,
+  "git_dirty": false,
+  "inputs": {
+    "cache_dir": "data/raw",
+    "data_source": "skempi",
+    "dataset": "1JTG",
+    "structure": "1jtg"
+  },
+  "notes": null,
+  "output": "results/1JTG_complex_pde_plain_grad_protenix_grad.npz",
+  "params": {
+    "baseline": "zeros",
+    "chain": "B",
+    "feature_cache": true,
+    "m_steps": 15,
+    "method": "plain_grad",
+    "msa_depth": null,
+    "msa_source": "single_seq",
+    "n_cycle": 4,
+    "res_type_grad": true,
+    "score": "complex_pde",
+    "single_seq": true,
+    "x_pred_cache": true,
+    "x_pred_mode": "predicted"
+  },
+  "stage": "03_attribute_protenix"
+}

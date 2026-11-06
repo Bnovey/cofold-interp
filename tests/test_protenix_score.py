@@ -21,8 +21,10 @@ from igv.protenix_score import (
     _build_token_map,
     _chain_cache_key,
     _compute_score_from_logits,
+    _feature_cache_key,
     _oop_msa_inference_forward,
     _prediction_cache_key,
+    build_features,
     build_mean_aa_res_type_baseline,
     build_shuffled_res_type_baseline,
     build_unk_res_type_baseline,
@@ -674,6 +676,342 @@ class TestCoordFingerprint:
         assert "sha256" in fp
         assert "shape" in fp
         assert "abs_max" in fp
+
+
+# ---------------------------------------------------------------------------
+# Feature cache key
+# ---------------------------------------------------------------------------
+
+
+class TestFeatureCacheKey:
+    def test_stable_for_same_inputs(self):
+        chains = {"A": "ACDE", "B": "FGH"}
+        k1 = _feature_cache_key(chains, None, None)
+        k2 = _feature_cache_key(chains, None, None)
+        assert k1 == k2
+
+    def test_differs_for_different_chains(self):
+        k1 = _feature_cache_key({"A": "ACDE"}, None, None)
+        k2 = _feature_cache_key({"A": "ACDF"}, None, None)
+        assert k1 != k2
+
+    def test_differs_for_different_msa_depth(self):
+        chains = {"A": "ACDE"}
+        k1 = _feature_cache_key(chains, None, 100)
+        k2 = _feature_cache_key(chains, None, 200)
+        assert k1 != k2
+
+    def test_differs_for_different_msa_paths(self, tmp_path):
+        chains = {"A": "ACDE"}
+        p1 = tmp_path / "a.a3m"
+        p2 = tmp_path / "b.a3m"
+        p1.write_text(">q\nACDE\n")
+        p2.write_text(">q\nACDE\n")
+        k1 = _feature_cache_key(chains, {"A": str(p1)}, None)
+        k2 = _feature_cache_key(chains, {"A": str(p2)}, None)
+        assert k1 != k2
+
+    def test_msa_present_vs_absent(self, tmp_path):
+        chains = {"A": "ACDE"}
+        p = tmp_path / "a.a3m"
+        p.write_text(">q\nACDE\n")
+        k1 = _feature_cache_key(chains, {"A": str(p)}, None)
+        k2 = _feature_cache_key(chains, None, None)
+        assert k1 != k2
+
+    def test_differs_for_different_model_name(self):
+        chains = {"A": "ACDE"}
+        k1 = _feature_cache_key(chains, None, None, model_name="model_a")
+        k2 = _feature_cache_key(chains, None, None, model_name="model_b")
+        assert k1 != k2
+
+    def test_depth_none_vs_set(self):
+        chains = {"A": "ACDE"}
+        k1 = _feature_cache_key(chains, None, None)
+        k2 = _feature_cache_key(chains, None, 512)
+        assert k1 != k2
+
+
+# ---------------------------------------------------------------------------
+# Feature cache round-trip (build_features)
+# ---------------------------------------------------------------------------
+
+
+class TestBuildFeaturesCache:
+    """Cache behaviour of build_features, using mocks for the data pipeline."""
+
+    @staticmethod
+    def _make_known_features():
+        return {
+            "ref_pos": torch.randn(10, 3),
+            "restype": torch.randn(1, 10, 32),
+            "asym_id": torch.zeros(10, dtype=torch.long),
+            "residue_index": torch.arange(10),
+            "token_exists_mask": torch.ones(10, dtype=torch.bool),
+            "non_tensor_int": 42,
+            "non_tensor_str": "hello",
+        }
+
+    @staticmethod
+    def _write_cache_file(cache_dir, chains, features, feature_cache_dir=None, **key_kwargs):
+        cache_key = _feature_cache_key(chains, key_kwargs.get("msa_paths"),
+                                       key_kwargs.get("msa_depth"),
+                                       key_kwargs.get("model_name"))
+        cache_root = Path(feature_cache_dir) if feature_cache_dir is not None else cache_dir / "cached_features"
+        feat_dir = cache_root / cache_key
+        feat_dir.mkdir(parents=True, exist_ok=True)
+        torch.save({"input_feature_dict": features}, feat_dir / "features.pt")
+
+    @staticmethod
+    def _pipeline_context(known_features, call_counter=None):
+        """Context manager that mocks protenix pipeline imports."""
+        import sys
+        from contextlib import contextmanager
+        from unittest.mock import MagicMock, patch
+
+        @contextmanager
+        def _ctx():
+            def fake_dataloader(configs):
+                if call_counter is not None:
+                    call_counter.append(1)
+                data = {
+                    "input_feature_dict": {
+                        k: v.clone() if isinstance(v, torch.Tensor) else v
+                        for k, v in known_features.items()
+                    }
+                }
+                batch = [(data, None, None)]
+                return [batch]
+
+            mock_infer = MagicMock()
+            mock_infer.get_inference_dataloader = fake_dataloader
+            mock_ptx_model = MagicMock()
+            mock_ptx_model.update_input_feature_dict = lambda x: x
+
+            with patch.dict(sys.modules, {
+                "protenix": MagicMock(),
+                "protenix.data": MagicMock(),
+                "protenix.data.core": MagicMock(),
+                "protenix.data.core.ccd": MagicMock(),
+                "protenix.data.inference": MagicMock(),
+                "protenix.data.inference.infer_dataloader": mock_infer,
+                "protenix.model": MagicMock(),
+                "protenix.model.protenix": mock_ptx_model,
+            }):
+                with patch("igv.protenix_score._sync_ccd_paths"):
+                    yield
+
+        return _ctx()
+
+    def test_cache_miss_writes_file(self, tmp_path):
+        chains = {"A": "ACDEFGHIKL"}
+        features = self._make_known_features()
+        counter = []
+        configs = MagicMock()
+        configs.load_checkpoint_dir = str(tmp_path / "ckpt")
+
+        with self._pipeline_context(features, counter):
+            result, _ = build_features(
+                chains, tmp_path, "cpu", configs,
+                use_feature_cache=True,
+            )
+
+        assert len(counter) == 1
+        cache_key = _feature_cache_key(chains, None, None)
+        cached_path = tmp_path / "cached_features" / cache_key / "features.pt"
+        assert cached_path.exists()
+
+    def test_cache_hit_returns_byte_identical(self, tmp_path):
+        chains = {"A": "ACDEFGHIKL"}
+        features = self._make_known_features()
+        self._write_cache_file(tmp_path, chains, features)
+
+        result, _ = build_features(
+            chains, tmp_path, "cpu", MagicMock(),
+            use_feature_cache=True,
+        )
+
+        for k, v in features.items():
+            if isinstance(v, torch.Tensor):
+                assert torch.equal(result[k].cpu(), v), f"Mismatch for tensor key {k!r}"
+            else:
+                assert result[k] == v, f"Mismatch for non-tensor key {k!r}"
+
+    def test_round_trip_save_then_load(self, tmp_path):
+        chains = {"A": "ACDEFGHIKL"}
+        features = self._make_known_features()
+        counter = []
+        configs = MagicMock()
+        configs.load_checkpoint_dir = str(tmp_path / "ckpt")
+
+        with self._pipeline_context(features, counter):
+            result1, _ = build_features(
+                chains, tmp_path, "cpu", configs,
+                use_feature_cache=True,
+            )
+            assert len(counter) == 1
+
+            result2, _ = build_features(
+                chains, tmp_path, "cpu", configs,
+                use_feature_cache=True,
+            )
+            assert len(counter) == 1
+
+        for k, v in result1.items():
+            if isinstance(v, torch.Tensor):
+                assert torch.equal(result2[k].cpu(), v.cpu()), f"Mismatch on reload for {k!r}"
+            else:
+                assert result2[k] == v
+
+    def test_non_tensor_values_round_trip(self, tmp_path):
+        chains = {"A": "ACDEFGHIKL"}
+        features = self._make_known_features()
+        self._write_cache_file(tmp_path, chains, features)
+
+        result, _ = build_features(
+            chains, tmp_path, "cpu", MagicMock(),
+            use_feature_cache=True,
+        )
+
+        assert result["non_tensor_int"] == 42
+        assert result["non_tensor_str"] == "hello"
+
+    def test_cache_not_consulted_when_off(self, tmp_path):
+        chains = {"A": "ACDEFGHIKL"}
+        cached_features = self._make_known_features()
+        self._write_cache_file(tmp_path, chains, cached_features)
+
+        pipeline_features = self._make_known_features()
+        counter = []
+        configs = MagicMock()
+        configs.load_checkpoint_dir = str(tmp_path / "ckpt")
+
+        with self._pipeline_context(pipeline_features, counter):
+            result, _ = build_features(
+                chains, tmp_path, "cpu", configs,
+                use_feature_cache=False,
+            )
+
+        assert len(counter) == 1
+        assert not torch.equal(result["ref_pos"].cpu(), cached_features["ref_pos"])
+
+    def test_different_chains_use_different_cache(self, tmp_path):
+        features_a = self._make_known_features()
+        features_b = self._make_known_features()
+        self._write_cache_file(tmp_path, {"A": "ACDEFGHIKL"}, features_a)
+        self._write_cache_file(tmp_path, {"A": "XXXXXXXXXX"}, features_b)
+
+        result_a, _ = build_features(
+            {"A": "ACDEFGHIKL"}, tmp_path, "cpu", MagicMock(),
+            use_feature_cache=True,
+        )
+        result_b, _ = build_features(
+            {"A": "XXXXXXXXXX"}, tmp_path, "cpu", MagicMock(),
+            use_feature_cache=True,
+        )
+
+        assert torch.equal(result_a["ref_pos"], features_a["ref_pos"])
+        assert torch.equal(result_b["ref_pos"], features_b["ref_pos"])
+        assert not torch.equal(result_a["ref_pos"], result_b["ref_pos"])
+
+    def test_feature_cache_dir_overrides_default(self, tmp_path):
+        chains = {"A": "ACDEFGHIKL"}
+        features = self._make_known_features()
+        shared_dir = tmp_path / "shared_features"
+        self._write_cache_file(tmp_path, chains, features, feature_cache_dir=shared_dir)
+
+        result, _ = build_features(
+            chains, tmp_path, "cpu", MagicMock(),
+            use_feature_cache=True,
+            feature_cache_dir=shared_dir,
+        )
+
+        for k, v in features.items():
+            if isinstance(v, torch.Tensor):
+                assert torch.equal(result[k].cpu(), v), f"Mismatch for {k!r}"
+            else:
+                assert result[k] == v
+
+        default_path = tmp_path / "cached_features"
+        assert not default_path.exists(), "Default cache location should not be used"
+
+    def test_omitting_feature_cache_dir_uses_default(self, tmp_path):
+        chains = {"A": "ACDEFGHIKL"}
+        features = self._make_known_features()
+        counter = []
+        configs = MagicMock()
+        configs.load_checkpoint_dir = str(tmp_path / "ckpt")
+
+        with self._pipeline_context(features, counter):
+            build_features(
+                chains, tmp_path, "cpu", configs,
+                use_feature_cache=True,
+            )
+
+        cache_key = _feature_cache_key(chains, None, None)
+        default_path = tmp_path / "cached_features" / cache_key / "features.pt"
+        assert default_path.exists(), "Default cache path should be used when feature_cache_dir is omitted"
+
+    def test_shared_feature_cache_dir_across_different_cache_dirs(self, tmp_path):
+        """Two calls with different cache_dir but the same feature_cache_dir
+        and same chains must hit the SAME cache entry."""
+        chains = {"A": "ACDEFGHIKL"}
+        features = self._make_known_features()
+
+        shared_dir = tmp_path / "shared_features"
+        cache_dir_attr = tmp_path / "protenix_attr" / "ds_H"
+        cache_dir_scan = tmp_path / "protenix_scan" / "ds_H"
+
+        counter = []
+        configs = MagicMock()
+        configs.load_checkpoint_dir = str(tmp_path / "ckpt")
+
+        with self._pipeline_context(features, counter):
+            result1, _ = build_features(
+                chains, cache_dir_attr, "cpu", configs,
+                use_feature_cache=True,
+                feature_cache_dir=shared_dir,
+            )
+            assert len(counter) == 1
+
+            result2, _ = build_features(
+                chains, cache_dir_scan, "cpu", configs,
+                use_feature_cache=True,
+                feature_cache_dir=shared_dir,
+            )
+            assert len(counter) == 1, (
+                "Pipeline was called again; the second call should have hit "
+                "the shared cache written by the first call"
+            )
+
+        for k, v in result1.items():
+            if isinstance(v, torch.Tensor):
+                assert torch.equal(result2[k].cpu(), v.cpu()), f"Mismatch for {k!r}"
+            else:
+                assert result2[k] == v
+
+    def test_atomic_write_no_partial_file(self, tmp_path):
+        from unittest.mock import patch
+
+        chains = {"A": "ACDEFGHIKL"}
+        features = self._make_known_features()
+        counter = []
+        configs = MagicMock()
+        configs.load_checkpoint_dir = str(tmp_path / "ckpt")
+
+        with self._pipeline_context(features, counter):
+            with patch("torch.save", side_effect=OSError("disk full")):
+                with pytest.raises(OSError, match="disk full"):
+                    build_features(
+                        chains, tmp_path, "cpu", configs,
+                        use_feature_cache=True,
+                    )
+
+        feat_dir = tmp_path / "cached_features"
+        if feat_dir.exists():
+            remaining = list(feat_dir.rglob("*"))
+            pt_files = [f for f in remaining if f.suffix in (".pt", ".tmp")]
+            assert len(pt_files) == 0, f"Partial files left: {pt_files}"
 
 
 @_requires_gpu

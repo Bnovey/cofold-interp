@@ -1,0 +1,43 @@
+{
+  "n": 532,
+  "method": "plain_grad",
+  "dataset": "1JTG",
+  "score": "complex_pde",
+  "spearman": 0.11761150760783284,
+  "spearman_ci_lo": 0.033717089207275945,
+  "spearman_ci_hi": 0.20200544919424654,
+  "pearson": 0.1819745178906032,
+  "pearson_ci_lo": 0.09093187685133343,
+  "pearson_ci_hi": 0.27204174513008134,
+  "permutation_null": {
+    "observed": 0.11761150760783284,
+    "p5": -0.07027795891973534,
+    "p95": 0.07088733405710106,
+    "p_value_two_sided": 0.0081,
+    "n_perms": 10000
+  },
+  "scale_ratio": 0.7521568443885481,
+  "median_abs_A": 0.06345168501138687,
+  "median_abs_B": 0.08435964584350586,
+  "per_position": {
+    "n_positions": 28,
+    "sum_spearman": 0.43076081007115485,
+    "max_spearman": 0.3497536945812808,
+    "sum_spearman_ci_lo": 0.051580550073488204,
+    "sum_spearman_ci_hi": 0.7061536732628759,
+    "max_spearman_ci_lo": -0.09927344492979369,
+    "max_spearman_ci_hi": 0.6855835854041891
+  },
+  "partial_spearman_distance_to_partner": 0.11294772690303685,
+  "partial_spearman_all_confounds": 0.0991500757171652,
+  "confound_names": [
+    "burial",
+    "delta_rsa",
+    "distance_to_partner",
+    "hydrophobicity",
+    "norm_position",
+    "residue_volume",
+    "rsa_complex",
+    "rsa_monomer"
+  ]
+}

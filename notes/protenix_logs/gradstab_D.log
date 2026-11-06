@@ -1,0 +1,28 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.6.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+2026-11-05 23:13:44,466 [/app/src/igv/protenix_score.py:288] INFO igv.protenix_score: Protenix protenix_base_default_v1.0.0 loaded (protenix_base_default_v1.0.0.pt)
+2026-11-05 23:13:44,501 [/app/src/igv/protenix_score.py:447] INFO igv.protenix_score: Loading cached features from data/raw/protenix_attr/1JTG_B/cached_features/A262_B165-f606f983_nomsa_protenix_base_default_v1.0.0/features.pt
+2026-11-05 23:13:44,797 [/app/src/igv/protenix_score.py:465] INFO igv.protenix_score: Cached features validated: ref_pos shape [3257, 3] dtype torch.float32, fingerprint 5e0a8e15f1ffeb9b
+2026-11-05 23:13:44,798 [/app/src/igv/protenix_score.py:986] INFO igv.protenix_score: Loading cached predicted coords from data/raw/predicted_coords/1JTG_A262_B165-f606f983/x_pred.pt
+2026-11-05 23:13:44,818 [/app/src/igv/protenix_score.py:999] INFO igv.protenix_score: Cached x_pred validated: shape [1, 3257, 3], abs max 29.1609
+train scheduler 16.0
+inference scheduler 16.0
+Diffusion Module has 16.0
+ alpha  rep            f            g.d          ||g||
+   0.5    0     9.951497        1.39986       11.92759
+   0.5    1     9.951497        1.39986       11.92759
+   1.0    0     9.676243       -7.59176      517.61847
+   1.0    1     9.676243       -7.59176      517.61847

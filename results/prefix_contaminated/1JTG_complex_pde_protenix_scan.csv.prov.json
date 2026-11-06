@@ -1,0 +1,75 @@
+{
+  "argv": [
+    "scripts/04_scan_protenix.py",
+    "--dataset",
+    "1JTG",
+    "--chain",
+    "B",
+    "--score",
+    "complex_pde",
+    "--n-cycle",
+    "4",
+    "--single-seq",
+    "--time-budget-s",
+    "20000"
+  ],
+  "arm": {
+    "autocast": "off",
+    "chain": "B",
+    "dataset": "1JTG",
+    "dtype": "fp32",
+    "geometry": "x_pred_predicted",
+    "method": "scan",
+    "mode": "resswap",
+    "model": "protenix",
+    "model_name": "protenix_base_default_v1.0.0",
+    "score": "complex_pde",
+    "trunk": "forward_only",
+    "wt_score": 9.685555458068848,
+    "x_pred_cache": true,
+    "x_pred_coords_frozen": true,
+    "x_pred_fingerprint": {
+      "abs_max": 29.160888671875,
+      "sha256": "c777aa4dec8cea3aed0cf6cbb1eae8e71d7535470f7ea4c8c39c645367141164",
+      "shape": [
+        1,
+        3257,
+        3
+      ]
+    }
+  },
+  "created_utc": "2026-11-05T22:56:21+00:00",
+  "env": {
+    "boltz": null,
+    "cuda_available": true,
+    "gpu_count": 1,
+    "gpu_name": "NVIDIA A100-SXM4-80GB",
+    "gpu_total_gib": 79.2,
+    "hostname": "0eec348c6dc7",
+    "platform": "Linux-6.8.0-1070-gcp-x86_64-with-glibc2.35",
+    "python": "3.11.18",
+    "torch": "2.7.1+cu126"
+  },
+  "git_commit": null,
+  "git_dirty": false,
+  "inputs": {
+    "dataset": "1JTG",
+    "structure": "1jtg"
+  },
+  "notes": "Protenix brute-force resswap scan. WT coords frozen (predicted).",
+  "output": "results/1JTG_complex_pde_protenix_scan.csv",
+  "params": {
+    "chain": "B",
+    "mode": "resswap",
+    "model_name": "protenix_base_default_v1.0.0",
+    "msa_depth": null,
+    "msa_source": "single_seq",
+    "n_cycle": 4,
+    "n_mutants": 532,
+    "n_positions": 28,
+    "time_budget_s": 20000,
+    "x_pred": "predicted",
+    "x_pred_cache": true
+  },
+  "stage": "04_scan_protenix"
+}

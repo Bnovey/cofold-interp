@@ -1,0 +1,41 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.6.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+2026-11-05 22:06:35,087 [/app/src/igv/protenix_score.py:288] INFO igv.protenix_score: Protenix protenix_base_default_v1.0.0 loaded (protenix_base_default_v1.0.0.pt)
+2026-11-05 22:06:35,372 [/usr/local/lib/python3.11/dist-packages/protenix/data/inference/infer_dataloader.py:283] INFO protenix.data.inference.infer_dataloader: Featurizing complex...
+2026-11-05 22:06:47,185 [/usr/local/lib/python3.11/dist-packages/protenix/data/constraint/constraint_featurizer.py:392] INFO protenix.data.constraint.constraint_featurizer: Loaded constraint feature: #atom contact:0 #contact:0 #pocket:0
+2026-11-05 22:06:47,301 [/usr/local/lib/python3.11/dist-packages/protenix/data/template/template_featurizer.py:684] INFO protenix.data.template.template_featurizer: Calling InferenceTemplateFeaturizer.make_template_feature
+2026-11-05 22:06:47,928 [/app/src/igv/protenix_score.py:891] INFO igv.protenix_score: Loading cached predicted coords from data/raw/predicted_coords/1JTG_A262_B165-f606f983/x_pred.pt
+2026-11-05 22:06:47,941 [/app/src/igv/protenix_score.py:904] INFO igv.protenix_score: Cached x_pred validated: shape [1, 3257, 3], abs max 29.1609
+train scheduler 16.0
+inference scheduler 16.0
+Diffusion Module has 16.0
+x_pred fingerprint: c777aa4dec8cea3a
+||d||=20.1408  nonzero=8540
+
+=== PATH PROFILE f(alpha) ===
+  alpha=0.0   f=12.176787
+  alpha=0.1   f=11.420660
+  alpha=0.25  f=9.695648
+  alpha=0.5   f=9.955785
+  alpha=0.75  f=9.549372
+  alpha=0.9   f=9.682346
+  alpha=1.0   f=9.460993
+  f(1)-f(0) = -2.715795
+
+=== ANALYTIC vs FINITE-DIFFERENCE directional derivative ===
+  alpha=0.1:  analytic=-13.9261   finite_diff=-44.0526   ratio=+0.316
+  alpha=0.5:  analytic=-1.4882   finite_diff=-5.0682   ratio=+0.294
+  alpha=0.9:  analytic=-16.0759   finite_diff=-14.0851   ratio=+1.141

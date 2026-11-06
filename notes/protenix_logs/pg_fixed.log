@@ -1,0 +1,37 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.6.2
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+04:25:51 __main__ INFO SKEMPI complex 1jtg (chain=B)
+04:25:51 __main__ INFO Complex chains: {'A': 262, 'B': 165}
+04:25:51 __main__ INFO Loading Protenix model (protenix_base_default_v1.0.0)
+2026-11-06 04:27:22,233 [/app/src/igv/protenix_score.py:288] INFO igv.protenix_score: Protenix protenix_base_default_v1.0.0 loaded (protenix_base_default_v1.0.0.pt)
+2026-11-06 04:27:22,267 [/app/scripts/03_attribute_protenix.py:268] INFO __main__: MSA source: single_seq (depth=default)
+2026-11-06 04:27:22,268 [/app/scripts/03_attribute_protenix.py:271] INFO __main__: Building Protenix features (cache=data/raw/protenix_attr/1JTG_B, feature_cache=True)
+2026-11-06 04:27:22,268 [/app/src/igv/protenix_score.py:450] INFO igv.protenix_score: Loading cached features from data/raw/protenix_features/A262_B165-f606f983_nomsa_protenix_base_default_v1.0.0/features.pt
+2026-11-06 04:27:22,565 [/app/src/igv/protenix_score.py:468] INFO igv.protenix_score: Cached features validated: ref_pos shape [3257, 3] dtype torch.float32, fingerprint c987246d8eb33d2b
+2026-11-06 04:27:22,566 [/app/scripts/03_attribute_protenix.py:279] INFO __main__: ref_pos fingerprint: {'sha256': 'c987246d8eb33d2bca60459f57e09a1b7586fb98b5220d6f3d45bdd98ef2629e', 'shape': [3257, 3], 'abs_max': 5.319520473480225}
+2026-11-06 04:27:22,566 [/app/src/igv/protenix_score.py:989] INFO igv.protenix_score: Loading cached predicted coords from data/raw/predicted_coords/1JTG_A262_B165-f606f983/x_pred.pt
+2026-11-06 04:27:22,587 [/app/src/igv/protenix_score.py:1002] INFO igv.protenix_score: Cached x_pred validated: shape [1, 3257, 3], abs max 29.1609
+2026-11-06 04:27:22,587 [/app/scripts/03_attribute_protenix.py:296] INFO __main__: x_pred (mode=predicted), coords.abs().max()=29.1609
+2026-11-06 04:27:22,587 [/app/scripts/03_attribute_protenix.py:297] INFO __main__: x_pred fingerprint: {'sha256': 'c777aa4dec8cea3aed0cf6cbb1eae8e71d7535470f7ea4c8c39c645367141164', 'shape': [1, 3257, 3], 'abs_max': 29.160888671875}
+2026-11-06 04:27:22,588 [/app/scripts/03_attribute_protenix.py:305] INFO __main__: Computing restype gradient (method=plain_grad)
+2026-11-06 04:27:22,904 [/app/src/igv/protenix_score.py:1143] WARNING igv.protenix_score: gradient_checkpointing=True requested but is unusable on the Protenix path (reentrant silently drops the restype gradient; non-reentrant fails its determinism check). Running without it; measured peak 35.14 GiB at n_cycle=4 on 1JTG.
+2026-11-06 04:27:59,392 [/app/scripts/03_attribute_protenix.py:334] INFO __main__: restype gradient: shape (165, 32) in 36.8 s
+2026-11-06 04:28:08,091 [/app/scripts/03_attribute_protenix.py:343] INFO __main__: f(x) = 9.472452
+2026-11-06 04:28:08,094 [/app/scripts/03_attribute_protenix.py:420] INFO __main__: Wrote results/1JTG_complex_pde_plain_grad_protenix_grad.npz
+2026-11-06 04:28:08,104 [/app/scripts/03_attribute_protenix.py:472] INFO __main__: Done.
+train scheduler 16.0
+inference scheduler 16.0
+Diffusion Module has 16.0

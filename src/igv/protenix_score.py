@@ -411,6 +411,10 @@ def build_features(
     model=None,
     msa_paths: dict[str, str | Path] | None = None,
     msa_depth: int | None = None,
+    *,
+    use_feature_cache: bool = False,
+    model_name: str | None = None,
+    feature_cache_dir: Path | None = None,
 ) -> tuple[dict, dict[tuple[str, int], int]]:
     """Build Protenix input_feature_dict and a token map.
 
@@ -423,15 +427,59 @@ def build_features(
     When ``msa_depth`` is set, the MSA sampling cutoff is overridden
     to cap the number of MSA rows used by the model.
 
+    When ``use_feature_cache`` is True, the feature dict is cached on disk
+    and reused on subsequent calls with matching inputs.  The cache lives
+    at ``feature_cache_dir / <key> / "features.pt"`` when *feature_cache_dir*
+    is given, otherwise at ``cache_dir / "cached_features" / <key> / ...``.
+
     Returns (input_feature_dict, token_map) where token_map maps
     (chain_label, residue_index) -> token position.
     """
     import torch
-    from protenix.data.inference.infer_dataloader import get_inference_dataloader
-    from protenix.model.protenix import update_input_feature_dict
 
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
+
+    if use_feature_cache:
+        _cache_key = _feature_cache_key(chains, msa_paths, msa_depth, model_name)
+        _cache_root = Path(feature_cache_dir) if feature_cache_dir is not None else cache_dir / "cached_features"
+        _feat_dir = _cache_root / _cache_key
+        _cached_path = _feat_dir / "features.pt"
+
+        if _cached_path.exists():
+            log.info("Loading cached features from %s", _cached_path)
+            cached = torch.load(
+                _cached_path,
+                map_location=device if isinstance(device, str) else str(device),
+                weights_only=False,
+            )
+            input_feature_dict = {
+                k: v.to(device) if isinstance(v, torch.Tensor) else v
+                for k, v in cached["input_feature_dict"].items()
+            }
+            ref_pos = input_feature_dict.get("ref_pos")
+            if (
+                ref_pos is not None
+                and isinstance(ref_pos, torch.Tensor)
+                and ref_pos.shape[-1] == 3
+                and ref_pos.dtype in (torch.float32, torch.float64)
+            ):
+                fp = coord_fingerprint(ref_pos)
+                log.info(
+                    "Cached features validated: ref_pos shape %s dtype %s, "
+                    "fingerprint %s",
+                    list(ref_pos.shape), ref_pos.dtype, fp["sha256"][:16],
+                )
+                token_map = _build_token_map(input_feature_dict, chains)
+                return input_feature_dict, token_map
+            log.warning(
+                "Cached features invalid (ref_pos=%s); rebuilding.",
+                type(ref_pos).__name__ if ref_pos is not None else "missing",
+            )
+
+    from protenix.data.inference.infer_dataloader import get_inference_dataloader
+    from protenix.model.protenix import update_input_feature_dict
+
     json_path = cache_dir / "input.json"
     write_protenix_json(chains, json_path, msa_paths=msa_paths)
     configs.input_json_path = str(json_path)
@@ -462,6 +510,27 @@ def build_features(
             )
 
     input_feature_dict = update_input_feature_dict(input_feature_dict)
+
+    if use_feature_cache:
+        ref_pos = input_feature_dict.get("ref_pos")
+        if ref_pos is not None:
+            fp = coord_fingerprint(ref_pos)
+            log.info(
+                "Features built: ref_pos shape %s, fingerprint %s",
+                list(ref_pos.shape), fp["sha256"][:16],
+            )
+        import tempfile
+
+        _feat_dir.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=str(_feat_dir), suffix=".tmp")
+        try:
+            os.close(fd)
+            torch.save({"input_feature_dict": input_feature_dict}, tmp)
+            os.replace(tmp, _cached_path)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
+        log.info("Cached features at %s", _cached_path)
 
     token_map = _build_token_map(input_feature_dict, chains)
     return input_feature_dict, token_map
@@ -835,6 +904,35 @@ def _chain_cache_key(chains: dict[str, str]) -> str:
 
 def _prediction_cache_key(chains: dict[str, str], dataset: str) -> str:
     return f"{dataset}_{_chain_cache_key(chains)}"
+
+
+def _feature_cache_key(
+    chains: dict[str, str],
+    msa_paths: dict[str, str | Path] | None,
+    msa_depth: int | None,
+    model_name: str | None = None,
+) -> str:
+    """Deterministic key for cached feature dicts."""
+    import hashlib
+
+    parts = [_chain_cache_key(chains)]
+
+    if msa_paths is not None:
+        msa_payload = "|".join(
+            f"{cid}:{str(Path(p).resolve())}"
+            for cid, p in sorted(msa_paths.items())
+        )
+        parts.append("msa" + hashlib.sha256(msa_payload.encode()).hexdigest()[:8])
+    else:
+        parts.append("nomsa")
+
+    if msa_depth is not None:
+        parts.append(f"d{msa_depth}")
+
+    if model_name is not None:
+        parts.append(model_name)
+
+    return "_".join(parts)
 
 
 def coord_fingerprint(tensor) -> dict[str, Any]:

@@ -1,0 +1,46 @@
+{
+  "argv": [
+    "scripts/24_faithfulness.py",
+    "--attribution",
+    "results/1JTG_complex_pde_plain_grad_protenix_grad.npz",
+    "--scan",
+    "results/1JTG_complex_pde_protenix_scan.csv",
+    "--dataset",
+    "1JTG",
+    "--chain",
+    "B",
+    "--score",
+    "complex_pde",
+    "--out",
+    "results/1JTG_faith_fixed_pg.json"
+  ],
+  "arm": {
+    "dataset": "1JTG",
+    "method": "plain_grad",
+    "score": "complex_pde",
+    "stage": "faithfulness"
+  },
+  "created_utc": "2026-11-06T04:28:26+00:00",
+  "env": {
+    "boltz": null,
+    "cuda_available": false,
+    "hostname": "f223a023882e",
+    "platform": "Linux-6.8.0-1070-gcp-x86_64-with-glibc2.35",
+    "python": "3.11.18",
+    "torch": "2.7.1+cu126"
+  },
+  "git_commit": null,
+  "git_dirty": false,
+  "inputs": {
+    "attribution": "results/1JTG_complex_pde_plain_grad_protenix_grad.npz",
+    "scan": "results/1JTG_complex_pde_protenix_scan.csv"
+  },
+  "notes": null,
+  "output": "results/1JTG_faith_fixed_pg.json",
+  "params": {
+    "chain": "B",
+    "dataset": "1JTG",
+    "score": "complex_pde"
+  },
+  "stage": "24_faithfulness"
+}

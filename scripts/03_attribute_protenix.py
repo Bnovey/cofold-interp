@@ -157,6 +157,10 @@ def main() -> None:
         help="Cache predicted coordinates on disk (default: on).",
     )
     parser.add_argument(
+        "--feature-cache", action=argparse.BooleanOptionalAction, default=True,
+        help="Cache feature dict on disk for cross-process reproducibility (default: on).",
+    )
+    parser.add_argument(
         "--msa-dir", default=None,
         help=(
             "Directory with per-chain .a3m files. Accepts the Boltz layout "
@@ -264,11 +268,15 @@ def main() -> None:
     log.info("MSA source: %s (depth=%s)", msa_source, args.msa_depth or "default")
 
     feat_cache = cache_dir / "protenix_attr" / f"{dataset}_{chain}"
-    log.info("Building Protenix features (cache=%s)", feat_cache)
+    log.info("Building Protenix features (cache=%s, feature_cache=%s)", feat_cache, args.feature_cache)
     input_feature_dict, token_map = build_features(
         chains, feat_cache, args.device, configs, model=model,
         msa_paths=msa_paths, msa_depth=args.msa_depth,
+        use_feature_cache=args.feature_cache, model_name=model_name,
+        feature_cache_dir=cache_dir / "protenix_features",
     )
+    _ref_pos_fp = coord_fingerprint(input_feature_dict["ref_pos"])
+    log.info("ref_pos fingerprint: %s", _ref_pos_fp)
 
     # --- 3. Obtain x_pred ---
     if args.x_pred == "predicted":
@@ -431,6 +439,7 @@ def main() -> None:
             "res_type_grad": res_type_grad_enabled,
             "x_pred_mode": args.x_pred,
             "x_pred_cache": args.x_pred_cache,
+            "feature_cache": args.feature_cache,
             "msa_source": msa_source,
             "msa_depth": args.msa_depth,
             "single_seq": args.single_seq,
@@ -450,7 +459,9 @@ def main() -> None:
             "msa_depth": args.msa_depth,
             **numerics_arm(),
             "x_pred_cache": args.x_pred_cache,
+            "feature_cache": args.feature_cache,
             "x_pred_fingerprint": _x_pred_fp,
+            "ref_pos_fingerprint": _ref_pos_fp,
             "coords_abs_max": _coords_max,
             "f_x": f_x_val,
             "f_baseline": f_baseline_val,
