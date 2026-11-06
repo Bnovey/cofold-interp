@@ -156,7 +156,7 @@ reassuring than planned. Both facts are needed together.
 
 ### Syncing the VM — `git pull` does NOT work, use a bundle
 
-Discovered 2026-09-29. The VM's remote is `git@github.com:Bnovey/ppi_IG.git`
+Discovered 2026-09-29. The VM's remote is `git@github.com:Bnovey/cofold-interp.git`
 but `~/.ssh` holds only `authorized_keys` — **no GitHub private key**, so
 `git pull` fails with `Permission denied (publickey)` after an initial
 `Host key verification failed`. Adding the host key via `ssh-keyscan` fixes

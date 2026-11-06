@@ -1,4 +1,4 @@
-# ppi_IG — can one gradient replace a mutation scan?
+# cofold-interp — can one gradient replace a mutation scan?
 
 Antibodies bind to targets, and drug designers want to know which mutations at
 the binding interface make that binding stronger or weaker.

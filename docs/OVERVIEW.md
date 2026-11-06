@@ -423,7 +423,7 @@ this project printed `STOPPED_ON_COMPLETE` while its stop command had errored.
 
 | what | where | backed up? |
 |---|---|---|
-| code, notes, research log | git → `github.com/Bnovey/ppi_IG`, branch `protein-ligand-pivot` | yes |
+| code, notes, research log | git → `github.com/Bnovey/cofold-interp`, branch `protein-ligand-pivot` | yes |
 | **results/ and data/** | local disk **and** `gs://agrosbio-ig-artifacts` | yes, since 2026-10-15 |
 | model weights | `~/boltz_cache` on the VM | **no, deliberately** |
 | VM environment | snapshot `igv-gpu-final-20261015` | yes |
