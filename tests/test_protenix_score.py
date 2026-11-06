@@ -1021,3 +1021,109 @@ class TestMemoryLadder:
 
     def test_memory_ladder(self):
         pytest.skip("Run scripts/08_memscale_protenix.py explicitly on GPU")
+
+
+class TestDownloadAtomic:
+    """`_download_atomic` must never leave a truncated file at the destination.
+
+    A plain urlretrieve leaves a partial file when the connection drops, and
+    callers guard on `dest.exists()`, so the partial is treated as complete
+    forever after. These tests pin the atomic behaviour.
+    """
+
+    @staticmethod
+    def _fake_response(payload: bytes, content_length=None, fail_after=None):
+        import io
+
+        class _Resp:
+            def __init__(self):
+                self._buf = io.BytesIO(payload)
+                self._read = 0
+                self.headers = {
+                    "Content-Length": str(
+                        len(payload) if content_length is None else content_length
+                    )
+                }
+
+            def read(self, n=-1):
+                if fail_after is not None and self._read >= fail_after:
+                    raise ConnectionResetError("simulated drop")
+                chunk = self._buf.read(n)
+                self._read += len(chunk)
+                return chunk
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        return _Resp()
+
+    def _patch(self, monkeypatch, resp_factory):
+        import urllib.request
+        from igv import protenix_score
+
+        monkeypatch.setattr(
+            urllib.request, "urlopen", lambda url: resp_factory(), raising=True
+        )
+        return protenix_score
+
+    def test_successful_download_writes_dest(self, tmp_path, monkeypatch):
+        payload = b"x" * 5000
+        ps = self._patch(monkeypatch, lambda: self._fake_response(payload))
+        dest = tmp_path / "sub" / "file.bin"
+        ps._download_atomic("http://example/f", dest)
+        assert dest.read_bytes() == payload
+        assert list(dest.parent.glob("*.part")) == []
+
+    def test_content_length_mismatch_raises_and_leaves_nothing(
+        self, tmp_path, monkeypatch
+    ):
+        # server claims more bytes than it sends -> truncated transfer
+        payload = b"y" * 100
+        ps = self._patch(
+            monkeypatch, lambda: self._fake_response(payload, content_length=999999)
+        )
+        dest = tmp_path / "file.bin"
+        with pytest.raises(IOError):
+            ps._download_atomic("http://example/f", dest)
+        assert not dest.exists(), "truncated download must not land at dest"
+        assert list(tmp_path.glob("*.part")) == [], "temp file must be cleaned up"
+
+    def test_connection_drop_leaves_nothing(self, tmp_path, monkeypatch):
+        payload = b"z" * 10000
+        ps = self._patch(
+            monkeypatch, lambda: self._fake_response(payload, fail_after=2048)
+        )
+        dest = tmp_path / "file.bin"
+        with pytest.raises(ConnectionResetError):
+            ps._download_atomic("http://example/f", dest)
+        assert not dest.exists()
+        assert list(tmp_path.glob("*.part")) == []
+
+    def test_missing_content_length_still_succeeds(self, tmp_path, monkeypatch):
+        """Servers may omit Content-Length; we must not reject that."""
+        import io
+
+        class _Resp:
+            def __init__(self):
+                self._buf = io.BytesIO(b"abc" * 10)
+                self.headers = {}
+
+            def read(self, n=-1):
+                return self._buf.read(n)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        import urllib.request
+        from igv import protenix_score
+
+        monkeypatch.setattr(urllib.request, "urlopen", lambda url: _Resp())
+        dest = tmp_path / "file.bin"
+        protenix_score._download_atomic("http://example/f", dest)
+        assert dest.read_bytes() == b"abc" * 10

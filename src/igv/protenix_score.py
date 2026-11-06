@@ -88,17 +88,52 @@ def _get_cache_dir() -> Path:
     return Path.home() / ".cache" / "protenix"
 
 
-def _download_weights(weights_dir: Path, model_name: str) -> None:
+def _download_atomic(url: str, dest: Path) -> None:
+    """Download *url* to *dest* atomically.
+
+    Writes to a temp file in the destination directory and ``os.replace``s it
+    into place only after the transfer completes and the byte count matches the
+    server's Content-Length. A plain ``urlretrieve`` straight to *dest* leaves a
+    truncated file behind when the connection drops, and because callers guard
+    on ``dest.exists()`` that truncated file is then treated as complete for
+    every subsequent run. That cost us a session on 2026-11-04, when a partial
+    469 MB ``components.cif`` had to be found by hand and re-fetched.
+    """
+    import tempfile
     import urllib.request
 
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(dest.parent), suffix=".part")
+    os.close(fd)
+    try:
+        with urllib.request.urlopen(url) as resp:
+            expected = resp.headers.get("Content-Length")
+            expected = int(expected) if expected is not None else None
+            written = 0
+            with open(tmp, "wb") as fh:
+                while True:
+                    chunk = resp.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    fh.write(chunk)
+                    written += len(chunk)
+        if expected is not None and written != expected:
+            raise IOError(
+                f"Truncated download for {url}: got {written} bytes, "
+                f"expected {expected}."
+            )
+        os.replace(tmp, dest)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
+def _download_weights(weights_dir: Path, model_name: str) -> None:
     _BASE = "https://protenix.tos-cn-beijing.volces.com"
-    ckpt_dir = weights_dir / "checkpoint"
-    ckpt_dir.mkdir(parents=True, exist_ok=True)
-    ckpt_path = ckpt_dir / f"{model_name}.pt"
+    ckpt_path = weights_dir / "checkpoint" / f"{model_name}.pt"
     if not ckpt_path.exists():
-        url = f"{_BASE}/checkpoint/{model_name}.pt"
         log.info("Downloading Protenix checkpoint %s ...", model_name)
-        urllib.request.urlretrieve(url, ckpt_path)
+        _download_atomic(f"{_BASE}/checkpoint/{model_name}.pt", ckpt_path)
 
     common_dir = weights_dir / "common"
     common_dir.mkdir(parents=True, exist_ok=True)
@@ -110,9 +145,8 @@ def _download_weights(weights_dir: Path, model_name: str) -> None:
     ]:
         fpath = common_dir / fname
         if not fpath.exists():
-            url = f"{_BASE}/{rel_url}"
             log.info("Downloading %s ...", fname)
-            urllib.request.urlretrieve(url, fpath)
+            _download_atomic(f"{_BASE}/{rel_url}", fpath)
 
 
 def _sync_ccd_paths(weights_dir: Path) -> None:

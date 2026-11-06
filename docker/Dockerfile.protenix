@@ -31,22 +31,49 @@ RUN python3 -m pip install --no-cache-dir \
 # protenix with --no-deps, then its actual dependencies minus the problematic ones
 RUN python3 -m pip install --no-cache-dir --no-deps protenix==2.0.0
 
+# torchvision / torchaudio must come from the same cu126 index as torch above,
+# or pip pulls the default-CUDA build and silently mismatches.
 RUN python3 -m pip install --no-cache-dir \
-        numpy==2.4.1 \
-        scipy \
+        torchvision==0.22.1+cu126 torchaudio==2.7.1+cu126 \
+        --index-url https://download.pytorch.org/whl/cu126
+
+# protenix 2.0.0 declares 32 requires_dist entries. Because we install it with
+# --no-deps (see above), every one of them has to be listed here or the import
+# fails at runtime with ModuleNotFoundError -- which is exactly what happened on
+# 2026-11-04 (optree), costing a GPU session. Pins mirror requires_dist exactly.
+#
+# Deliberately EXCLUDED, do not re-add without re-testing on an A100:
+#   cuequivariance-torch==0.8.0, cuequivariance-ops-torch-cu12==0.8.0  (segfault)
+#   deepspeed==0.17.5                                                  (unused)
+RUN python3 -m pip install --no-cache-dir \
+        PyYAML==6.0.2 \
         biopython==1.85 \
+        biotite==1.4.0 \
+        fair-esm==2.0.0 \
         gemmi==0.6.7 \
-        scikit-learn==1.7.1 \
+        icecream==2.1.7 \
+        ipdb==0.13.13 \
+        ipywidgets==8.1.7 \
+        matplotlib==3.10.5 \
+        ml_collections==1.1.0 \
         modelcif==1.4 \
-        ml-collections \
-        biotite \
-        rdkit \
-        pandas \
-        requests \
+        "networkx>=3.4.2" \
+        numpy==2.4.1 \
+        optree==0.17.0 \
+        pandas==2.3.1 \
+        pdbeccdutils==1.0.0 \
+        protobuf==6.31.1 \
+        py3Dmol==2.5.2 \
+        "pydantic>=2.0.0" \
+        rdkit==2025.9.3 \
+        scikit-learn==1.7.1 \
+        scikit-learn-extra==0.3.0 \
+        "scipy>=1.9.0" \
+        tqdm==4.67.1 \
+        triton==3.3.1 \
         wandb==0.21.1 \
         einops \
-        pyyaml \
-        tqdm \
+        requests \
         pyarrow
 
 # Clone Protenix repo for configs/ and runner/ (not in pip package)
@@ -61,7 +88,11 @@ RUN python3 -m pip install --no-cache-dir -e ".[dev]"
 
 RUN git config --global --add safe.directory /app
 
-# Verify protenix imports work without cuequivariance
-RUN python3 -c "import protenix; print('protenix', protenix.__version__)"
+# Verify protenix imports AND that every declared dependency actually resolves.
+# A bare `import protenix` does not touch the lazily-imported modules that bit us.
+RUN python3 -c "import protenix; print('protenix', protenix.__version__)" && \
+    python3 -c "import optree, icecream, ipdb, py3Dmol, esm, matplotlib, ipywidgets, \
+pdbeccdutils, sklearn_extra, torchvision, torchaudio, networkx, pydantic, google.protobuf; \
+print('all protenix deps import OK')"
 
 CMD ["python3", "-m", "pytest", "tests/test_protenix_score.py", "-v"]
